@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monad_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monad_network
+    healthcheck:
+      test:
+        ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      interval: 10s
+
+  symfony:
+    build:
+      context: ./backend/monad-backend
+      dockerfile: Dockerfile
+    container_name: monad_symfony
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+    ports:
+      - "${SYMFONY_PORT}:8000"
+    volumes:
+      - ./backend/monad-backend:/var/www/html
+      - symfony_var:/var/www/html/var
+    networks:
+      - monad_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /var/www/html
+    command: sh -c "composer install --no-interaction && symfony server:start --no-tls --port=8000 --allow-http --listen-ip=0.0.0.0"
+
+volumes:
+  postgres_data:
+  symfony_var:
+
+networks:
+  monad_network:
+    driver: bridge
