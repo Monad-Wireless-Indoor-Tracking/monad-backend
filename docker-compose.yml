@@ -29,8 +29,8 @@ services:
       APP_ENV: ${APP_ENV}
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_SECRET_KEY: /var/www/html/config/jwt/private.pem
+      JWT_PUBLIC_KEY: /var/www/html/config/jwt/public.pem
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
     ports:

@@ -1,0 +1,124 @@
+// Quest Management System Database Schema
+
+// Enums
+Enum quest_enrollment_status {
+  in_progress
+  completed
+  failed
+  abandoned
+}
+
+Enum quest_step_completion_status {
+  in_progress
+  completed
+  failed
+  skipped
+}
+
+Enum quest_step_type {
+  start
+  wait
+  scan_qr
+  connect_to_ap
+  walk_to
+  finish
+}
+
+// Tables
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar(255) [unique, not null]
+  role varchar[] [not null, default: `'{}'`, note: 'Array of roles']
+  name varchar(255) [not null]
+  password varchar(255) [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table quests {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(255) [not null]
+  description text [not null]
+  available_from timestamp [not null]
+  available_to timestamp
+  created_by uuid [ref: > users.id, not null]
+  points float [not null, default: 0]
+  estimated_duration integer [note: 'Duration in minutes']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table quest_steps {
+  id uuid [pk, default: `gen_random_uuid()`]
+  quest_id uuid [ref: > quests.id, not null]
+  name varchar(255) [not null]
+  type quest_step_type [not null]
+  order int [not null]
+  config jsonb [not null, default: `'{}'`, note: 'Configuration for step: qr_code id for scan_qr, AP ssid/password for connect_to_ap, coordinates for walk_to, wait duration for wait, etc.']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Indexes {
+    (quest_id, order) [unique, name: 'quest_step_order_idx']
+  }
+}
+
+Table quest_enrollments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [ref: > users.id, not null]
+  quest_id uuid [ref: > quests.id, not null]
+  status quest_enrollment_status [not null, default: 'in_progress']
+  data_path varchar(512) [note: 'AWS S3 reference to .tar.gz file with logs and collected data']
+  completed_at timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  Indexes {
+    (user_id, quest_id) [unique, name: 'user_quest_enrollment_idx']
+    status [name: 'enrollment_status_idx']
+  }
+}
+
+Table quest_step_completions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  enrollment_id uuid [ref: > quest_enrollments.id, not null]
+  step_id uuid [ref: > quest_steps.id, not null]
+  status quest_step_completion_status [not null, default: 'in_progress']
+  created_at timestamp [not null, default: `now()`]
+  completed_at timestamp
+
+  Indexes {
+    (enrollment_id, step_id) [unique, name: 'enrollment_step_completion_idx']
+  }
+}
+
+Table quest_step_skip_records {
+  id uuid [pk, default: `gen_random_uuid()`]
+  step_completion_id uuid [ref: > quest_step_completions.id, not null, note: 'Reference to the skipped/failed step completion']
+  message text [not null, note: 'Error message or reason why the step was skipped/failed']
+  error_code varchar(100) [note: 'Optional error code for categorization']
+  metadata jsonb [default: `'{}'`, note: 'Additional error context, stack traces, or debugging info']
+  created_at timestamp [not null, default: `now()`]
+
+  Indexes {
+    step_completion_id [name: 'skip_record_completion_idx']
+  }
+}
+
+Table qr_codes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(255) [not null]
+  position geography(POINT, 4326) [not null, note: 'PostGIS point - QR code location in space']
+  value varchar(255) [unique, not null]
+  created_by uuid [ref: > users.id, not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table news {
+  id uuid [pk, default: `gen_random_uuid()`]
+  title varchar(255) [not null]
+  content text [not null]
+  created_by uuid [ref: > users.id, not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}

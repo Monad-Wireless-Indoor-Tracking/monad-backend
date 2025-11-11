@@ -1,0 +1,106 @@
+%%{init: {'theme':'dark'}}%%
+erDiagram
+    users ||--o{ quests : creates
+    users ||--o{ quest_enrollments : enrolls
+    users ||--o{ qr_codes : creates
+    users ||--o{ access_points : creates
+    users ||--o{ locations : creates
+    users ||--o{ news : creates
+
+    quests ||--o{ quest_steps : contains
+    quests ||--o{ quest_enrollments : has
+
+    quest_steps ||--o{ quest_step_completions : tracks
+
+    quest_enrollments ||--o{ quest_step_completions : has
+
+    users {
+        uuid id PK
+        varchar email UK "NOT NULL"
+        varchar_array role "Array of roles"
+        varchar name
+        varchar password "NOT NULL"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    quests {
+        uuid id PK
+        varchar name "NOT NULL"
+        text description
+        timestamp available_from
+        uuid created_by FK "NOT NULL"
+        float points
+        varchar estimated_duration
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    quest_steps {
+        uuid id PK
+        uuid quest_id FK "NOT NULL"
+        varchar name "NOT NULL"
+        quest_step_type type "NOT NULL (start, wait, scan_qr, connect_to_ap, walk_to, finish)"
+        int order "NOT NULL"
+        jsonb config "Configuration for step (wifi ssid, qr_code id, wait duration, etc.)"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    quest_enrollments {
+        uuid id PK
+        uuid user_id FK "NOT NULL"
+        uuid quest_id FK "NOT NULL"
+        quest_enrollment_status status "NOT NULL, DEFAULT in_progress (in_progress, completed, failed, abandoned)"
+        varchar data_path "Reference to storage with logs"
+        timestamp completed_at
+        timestamp created_at "DEFAULT now()"
+    }
+
+    quest_step_completions {
+        uuid id PK
+        uuid enrollment_id FK "NOT NULL"
+        uuid step_id FK "NOT NULL"
+        quest_step_completion_status status "NOT NULL, DEFAULT in_progress (in_progress, completed, failed, skipped)"
+        timestamp created_at "DEFAULT now()"
+        timestamp completed_at
+    }
+
+    qr_codes {
+        uuid id PK
+        varchar name "NOT NULL"
+        varchar position_image "NOT NULL - Image showing QR code location"
+        varchar value "NOT NULL"
+        uuid created_by FK "NOT NULL"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    access_points {
+        uuid id PK
+        varchar name "NOT NULL"
+        varchar ssid "NOT NULL"
+        varchar password "NOT NULL"
+        varchar position_image "NOT NULL - Image showing access point location"
+        uuid created_by FK "NOT NULL"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    locations {
+        uuid id PK
+        varchar name "NOT NULL"
+        varchar location_image "Image URL of the location"
+        uuid created_by FK "NOT NULL"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
+
+    news {
+        uuid id PK
+        varchar title "NOT NULL"
+        text content
+        uuid created_by FK "NOT NULL"
+        timestamp created_at "DEFAULT now()"
+        timestamp updated_at "DEFAULT now()"
+    }
