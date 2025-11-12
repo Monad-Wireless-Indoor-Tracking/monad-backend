@@ -278,6 +278,705 @@
                 }
             }
         },
+        "/api/quest/{id}": {
+            "get": {
+                "tags": [
+                    "Quest"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quest details retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "example": "60000a54-e220-4b17-95c3-ebdfa164caf9",
+                                            "description": "Quest unique identifier"
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "example": "Campus Discovery",
+                                            "description": "Quest name"
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "example": "Explore the campus and discover hidden locations",
+                                            "description": "Quest description"
+                                        },
+                                        "points": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 100,
+                                            "description": "Points awarded for completion"
+                                        },
+                                        "estimatedDuration": {
+                                            "type": "integer",
+                                            "nullable": true,
+                                            "example": 30,
+                                            "description": "Estimated duration in minutes"
+                                        },
+                                        "createdAt": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "example": "2025-11-11 15:28:44",
+                                            "description": "Quest creation timestamp"
+                                        },
+                                        "steps": {
+                                            "type": "array",
+                                            "description": "Quest steps ordered by sequence",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid",
+                                                        "example": "70000a54-e220-4b17-95c3-ebdfa164caf9",
+                                                        "description": "Step unique identifier"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Scan QR Code at Library",
+                                                        "description": "Step name"
+                                                    },
+                                                    "type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "start",
+                                                            "wait",
+                                                            "scan_qr",
+                                                            "connect_to_ap",
+                                                            "walk_to",
+                                                            "find_ble_device",
+                                                            "finish"
+                                                        ],
+                                                        "example": "scan_qr",
+                                                        "description": "Step type"
+                                                    },
+                                                    "order": {
+                                                        "type": "integer",
+                                                        "example": 1,
+                                                        "description": "Step order in quest sequence"
+                                                    },
+                                                    "config": {
+                                                        "type": "object",
+                                                        "example": {
+                                                            "qr_code_id": "abc123"
+                                                        },
+                                                        "description": "Step-specific configuration"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid UUID format",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Invalid quest ID format"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quest not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Quest not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Get quest detail",
+                "description": "Returns full quest details including all steps. Does not require authentication.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quest UUID",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "60000a54-e220-4b17-95c3-ebdfa164caf9"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": []
+            }
+        },
+        "/api/quest/{id}/start": {
+            "post": {
+                "tags": [
+                    "Quest"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quest started successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enrollment_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "example": "70000b64-f330-5c27-a6d4-fceegb275db0",
+                                            "description": "Quest enrollment UUID"
+                                        },
+                                        "quest": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "60000a54-e220-4b17-95c3-ebdfa164caf9"
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "City Explorer Quest"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "example": "Explore the city and discover hidden gems"
+                                                },
+                                                "steps": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "step_id": {
+                                                                "type": "string",
+                                                                "format": "uuid",
+                                                                "description": "Quest step identifier"
+                                                            },
+                                                            "step_completion_id": {
+                                                                "type": "string",
+                                                                "format": "uuid",
+                                                                "description": "Step completion record identifier"
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "description": "Step name"
+                                                            },
+                                                            "type": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "start",
+                                                                    "wait",
+                                                                    "scan_qr",
+                                                                    "connect_to_ap",
+                                                                    "walk_to",
+                                                                    "find_ble_device",
+                                                                    "finish"
+                                                                ],
+                                                                "description": "Step type"
+                                                            },
+                                                            "order": {
+                                                                "type": "integer",
+                                                                "description": "Step sequence order"
+                                                            },
+                                                            "config": {
+                                                                "type": "object",
+                                                                "description": "Step-specific configuration"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "data_path": {
+                                            "type": "string",
+                                            "example": "s3://monad-bucket/experiments/2025/11/11/60000a54-e220-4b17-95c3-ebdfa164caf9/70000b64-f330-5c27-a6d4-fceegb275db0/",
+                                            "description": "S3 data storage path for quest data"
+                                        },
+                                        "started_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "example": "2025-11-11T15:28:44Z",
+                                            "description": "Quest start timestamp"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - quest is not active or invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Quest is not currently active"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Authentication required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quest not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Quest not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict - user already enrolled in this quest",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "You are already enrolled in this quest"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Start a quest",
+                "description": "Creates a quest enrollment for the authenticated user and initializes all quest step completions",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quest UUID",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "60000a54-e220-4b17-95c3-ebdfa164caf9"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/api/quest/{quest_id}/complete": {
+            "post": {
+                "tags": [
+                    "Quest"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quest completed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true,
+                                            "description": "Whether quest was completed successfully"
+                                        },
+                                        "enrollment_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Quest enrollment UUID"
+                                        },
+                                        "points_earned": {
+                                            "type": "number",
+                                            "example": 100,
+                                            "description": "Points earned for completion"
+                                        },
+                                        "completed_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "Quest completion timestamp"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid data structure or validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "description": "Validation error details"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Not authenticated"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - enrollment does not belong to authenticated user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "This enrollment does not belong to you"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Enrollment not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Enrollment not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict - enrollment already completed or abandoned",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Enrollment is already completed"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Complete a quest",
+                "description": "Receives bulk data from device after quest completion and updates enrollment and step completions",
+                "parameters": [
+                    {
+                        "name": "quest_id",
+                        "in": "path",
+                        "description": "Quest UUID",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "requestBody": {
+                    "description": "Quest completion data including all step results",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "enrollment_id",
+                                    "completed_at",
+                                    "steps"
+                                ],
+                                "properties": {
+                                    "enrollment_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "60000a54-e220-4b17-95c3-ebdfa164caf9",
+                                        "description": "Quest enrollment UUID"
+                                    },
+                                    "completed_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2025-11-11T15:30:00Z",
+                                        "description": "Quest completion timestamp"
+                                    },
+                                    "steps": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "step_completion_id",
+                                                "status",
+                                                "started_at",
+                                                "completed_at"
+                                            ],
+                                            "properties": {
+                                                "step_completion_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "description": "Step completion record UUID"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "completed",
+                                                        "failed",
+                                                        "skipped"
+                                                    ],
+                                                    "description": "Step completion status"
+                                                },
+                                                "started_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Step start timestamp"
+                                                },
+                                                "completed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Step completion timestamp"
+                                                },
+                                                "step_data": {
+                                                    "type": "object",
+                                                    "nullable": true,
+                                                    "description": "Step-specific data collected during execution"
+                                                },
+                                                "skip_record": {
+                                                    "type": "object",
+                                                    "nullable": true,
+                                                    "description": "Required for failed/skipped steps",
+                                                    "properties": {
+                                                        "message": {
+                                                            "type": "string",
+                                                            "description": "Reason for skipping/failing"
+                                                        },
+                                                        "error_code": {
+                                                            "type": "string",
+                                                            "nullable": true,
+                                                            "description": "Optional error code"
+                                                        },
+                                                        "metadata": {
+                                                            "type": "object",
+                                                            "nullable": true,
+                                                            "description": "Additional metadata"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "data_file": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Optional file metadata if data file was uploaded",
+                                        "properties": {
+                                            "filename": {
+                                                "type": "string",
+                                                "description": "Name of uploaded file"
+                                            },
+                                            "size": {
+                                                "type": "number",
+                                                "description": "File size in bytes"
+                                            },
+                                            "checksum": {
+                                                "type": "string",
+                                                "description": "File checksum for validation"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/api/quests": {
+            "get": {
+                "tags": [
+                    "Quest"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of quests retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "quests": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid",
+                                                        "example": "60000a54-e220-4b17-95c3-ebdfa164caf9",
+                                                        "description": "Quest unique identifier"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Campus Discovery Tour",
+                                                        "description": "Quest name"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Explore the main campus buildings and learn about university history",
+                                                        "description": "Quest description"
+                                                    },
+                                                    "points": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 100,
+                                                        "description": "Points awarded for completing this quest"
+                                                    },
+                                                    "estimatedDuration": {
+                                                        "type": "integer",
+                                                        "nullable": true,
+                                                        "example": 30,
+                                                        "description": "Estimated duration in minutes"
+                                                    },
+                                                    "numberOfSteps": {
+                                                        "type": "integer",
+                                                        "example": 5,
+                                                        "description": "Number of steps in this quest"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid status parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Invalid status parameter. Allowed values: active, expired"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Get list of quests",
+                "description": "Returns a list of quests filtered by status. By default returns active quests (available_from < now < available_to).",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter quests by status: active (default) or expired",
+                        "required": false,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "expired"
+                            ],
+                            "default": "active"
+                        },
+                        "style": "form",
+                        "explode": false
+                    }
+                ],
+                "security": []
+            }
+        },
         "/api/auth/me": {
             "get": {
                 "tags": [
@@ -386,6 +1085,10 @@
         {
             "name": "User",
             "description": "User management endpoints"
+        },
+        {
+            "name": "Quest",
+            "description": "Quest management and enrollment endpoints"
         }
     ],
     "webhooks": {}

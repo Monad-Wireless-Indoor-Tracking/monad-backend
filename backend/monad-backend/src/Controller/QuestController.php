@@ -1,0 +1,753 @@
+<?php
+
+namespace App\Controller;
+
+use App\Dto\Quest\QuestCompleteDataFileDto;
+use App\Dto\Quest\QuestCompleteRequestDto;
+use App\Dto\Quest\QuestCompleteResponseDto;
+use App\Dto\Quest\QuestCompleteSkipRecordDto;
+use App\Dto\Quest\QuestCompleteStepDto;
+use App\Dto\Quest\QuestDetailResponseDto;
+use App\Dto\Quest\QuestListResponseDto;
+use App\Dto\Quest\QuestStartQuestDto;
+use App\Dto\Quest\QuestStartResponseDto;
+use App\Dto\Quest\QuestStartStepDto;
+use App\Entity\QuestEnrollment;
+use App\Entity\QuestStepCompletion;
+use App\Entity\QuestStepSkipRecord;
+use App\Entity\User;
+use App\Enum\QuestEnrollmentStatus;
+use App\Enum\QuestStepCompletionStatus;
+use App\Repository\QuestEnrollmentRepository;
+use App\Repository\QuestRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+use OpenApi\Attributes as OA;
+
+class QuestController extends AbstractController
+{
+    #[Route('/api/quests', name: 'api_quests_list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/quests',
+        summary: 'Get list of quests',
+        description: 'Returns a list of quests filtered by status. By default returns active quests (available_from < now < available_to).',
+        tags: ['Quests']
+    )]
+    #[OA\Parameter(
+        name: 'status',
+        in: 'query',
+        description: 'Filter quests by status: active (default) or expired',
+        required: false,
+        schema: new OA\Schema(
+            type: 'string',
+            enum: ['active', 'expired'],
+            default: 'active'
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'List of quests retrieved successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'quests',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9', description: 'Quest unique identifier'),
+                            new OA\Property(property: 'name', type: 'string', example: 'Campus Discovery Tour', description: 'Quest name'),
+                            new OA\Property(property: 'description', type: 'string', example: 'Explore the main campus buildings and learn about university history', description: 'Quest description'),
+                            new OA\Property(property: 'points', type: 'number', format: 'float', example: 100.0, description: 'Points awarded for completing this quest'),
+                            new OA\Property(property: 'estimatedDuration', type: 'integer', nullable: true, example: 30, description: 'Estimated duration in minutes'),
+                            new OA\Property(property: 'numberOfSteps', type: 'integer', example: 5, description: 'Number of steps in this quest')
+                        ],
+                        type: 'object'
+                    )
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Bad request - invalid status parameter',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Invalid status parameter. Allowed values: active, expired')
+            ]
+        )
+    )]
+    public function getQuests(
+        Request $request,
+        QuestRepository $questRepository
+    ): JsonResponse {
+        $status = $request->query->get('status', 'active');
+
+        // Validate status parameter
+        if (!in_array($status, ['active', 'expired'])) {
+            return $this->json([
+                'error' => 'Invalid status parameter. Allowed values: active, expired'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Fetch quests based on status
+        try {
+            if ($status === 'expired') {
+                $quests = $questRepository->findExpiredQuests();
+            } else {
+                $quests = $questRepository->findActiveQuests();
+            }
+
+            // Transform entities to DTOs
+            $questDtos = array_map(
+                fn($quest) => (new QuestListResponseDto($quest))->toArray(),
+                $quests
+            );
+
+            return $this->json([
+                'quests' => $questDtos
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json([
+                'error' => 'Failed to retrieve quests',
+                'message' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/api/quest/{id}', name: 'api_quest_detail', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/quest/{id}',
+        summary: 'Get quest detail',
+        description: 'Returns full quest details including all steps. Does not require authentication.',
+        tags: ['Quest']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        description: 'Quest UUID',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Quest details retrieved successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9', description: 'Quest unique identifier'),
+                new OA\Property(property: 'name', type: 'string', example: 'Campus Discovery', description: 'Quest name'),
+                new OA\Property(property: 'description', type: 'string', example: 'Explore the campus and discover hidden locations', description: 'Quest description'),
+                new OA\Property(property: 'points', type: 'number', format: 'float', example: 100.0, description: 'Points awarded for completion'),
+                new OA\Property(property: 'estimatedDuration', type: 'integer', example: 30, nullable: true, description: 'Estimated duration in minutes'),
+                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2025-11-11 15:28:44', description: 'Quest creation timestamp'),
+                new OA\Property(
+                    property: 'steps',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '70000a54-e220-4b17-95c3-ebdfa164caf9', description: 'Step unique identifier'),
+                            new OA\Property(property: 'name', type: 'string', example: 'Scan QR Code at Library', description: 'Step name'),
+                            new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish'], example: 'scan_qr', description: 'Step type'),
+                            new OA\Property(property: 'order', type: 'integer', example: 1, description: 'Step order in quest sequence'),
+                            new OA\Property(property: 'config', type: 'object', example: ['qr_code_id' => 'abc123'], description: 'Step-specific configuration')
+                        ],
+                        type: 'object'
+                    ),
+                    description: 'Quest steps ordered by sequence'
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Quest not found',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Quest not found')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Invalid UUID format',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Invalid quest ID format')
+            ]
+        )
+    )]
+    public function getQuestDetail(
+        string $id,
+        QuestRepository $questRepository
+    ): JsonResponse {
+        // Validate UUID format
+        if (!Uuid::isValid($id)) {
+            return $this->json([
+                'error' => 'Invalid quest ID format'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Convert string to Uuid object
+        $uuid = Uuid::fromString($id);
+
+        // Find quest with steps (eager loading)
+        $quest = $questRepository->findOneBy(['id' => $uuid]);
+
+        if (!$quest) {
+            return $this->json([
+                'error' => 'Quest not found'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Convert to DTO and return
+        $dto = QuestDetailResponseDto::fromEntity($quest);
+
+        return $this->json($dto->toArray());
+    }
+
+    #[Route('/api/quest/{id}/start', name: 'api_quest_start', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/quest/{id}/start',
+        summary: 'Start a quest',
+        description: 'Creates a quest enrollment for the authenticated user and initializes all quest step completions',
+        security: [['Bearer' => []]],
+        tags: ['Quest']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'Quest UUID',
+        schema: new OA\Schema(type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Quest started successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'enrollment_id', type: 'string', format: 'uuid', example: '70000b64-f330-5c27-a6d4-fceegb275db0'),
+                new OA\Property(
+                    property: 'quest',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9'),
+                        new OA\Property(property: 'name', type: 'string', example: 'City Explorer Quest'),
+                        new OA\Property(property: 'description', type: 'string', example: 'Explore the city and discover hidden gems'),
+                        new OA\Property(
+                            property: 'steps',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'step_id', type: 'string', format: 'uuid'),
+                                    new OA\Property(property: 'step_completion_id', type: 'string', format: 'uuid'),
+                                    new OA\Property(property: 'name', type: 'string'),
+                                    new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish']),
+                                    new OA\Property(property: 'order', type: 'integer'),
+                                    new OA\Property(property: 'config', type: 'object')
+                                ],
+                                type: 'object'
+                            )
+                        )
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(property: 'data_path', type: 'string', example: 's3://monad-bucket/experiments/2025/11/11/60000a54-e220-4b17-95c3-ebdfa164caf9/70000b64-f330-5c27-a6d4-fceegb275db0/'),
+                new OA\Property(property: 'started_at', type: 'string', format: 'date-time', example: '2025-11-11T15:28:44Z')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Bad request - quest is not active or invalid',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Quest is not currently active')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Unauthorized - not authenticated',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Authentication required')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Quest not found',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Quest not found')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'Conflict - user already enrolled in this quest',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'You are already enrolled in this quest')
+            ]
+        )
+    )]
+    public function startQuest(
+        string $id,
+        QuestRepository $questRepository,
+        QuestEnrollmentRepository $enrollmentRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        // Check authentication
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json([
+                'error' => 'Authentication required'
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validate UUID format
+        try {
+            $questId = Uuid::fromString($id);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json([
+                'error' => 'Invalid quest ID format'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Find quest
+        $quest = $questRepository->find($questId);
+        if (!$quest) {
+            return $this->json([
+                'error' => 'Quest not found'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Validate quest is active
+        $now = new \DateTime();
+        $availableFrom = $quest->getAvailableFrom();
+        $availableTo = $quest->getAvailableTo();
+
+        if ($availableFrom && $availableFrom > $now) {
+            return $this->json([
+                'error' => 'Quest is not yet available'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($availableTo && $availableTo < $now) {
+            return $this->json([
+                'error' => 'Quest is no longer available'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Check if user is already enrolled
+        $existingEnrollment = $enrollmentRepository->findOneBy([
+            'user' => $user,
+            'quest' => $quest
+        ]);
+
+        if ($existingEnrollment) {
+            return $this->json([
+                'error' => 'You are already enrolled in this quest'
+            ], Response::HTTP_CONFLICT);
+        }
+
+        // Create data path: s3://monad-bucket/experiments/YYYY/MM/DD/:user_id/:quest_id/
+        $date = new \DateTime();
+        $dataPath = sprintf(
+            's3://monad-bucket/experiments/%s/%s/%s/%s/%s/',
+            $date->format('Y'),
+            $date->format('m'),
+            $date->format('d'),
+            (string) $user->getId(),
+            (string) $quest->getId()
+        );
+
+        // Create quest enrollment
+        $enrollment = new QuestEnrollment();
+        $enrollment->setUser($user);
+        $enrollment->setQuest($quest);
+        $enrollment->setDataPath($dataPath);
+        $enrollment->setCompletedAt(null);
+
+        // Create quest step completions for all steps
+        $steps = $quest->getSteps();
+        $stepDtos = [];
+
+        foreach ($steps as $step) {
+            $stepCompletion = new QuestStepCompletion();
+            $stepCompletion->setEnrollment($enrollment);
+            $stepCompletion->setStep($step);
+
+            $enrollment->addStepCompletion($stepCompletion);
+            $entityManager->persist($stepCompletion);
+
+            // Create DTO for response
+            $stepDtos[] = QuestStartStepDto::fromEntities($step, $stepCompletion);
+        }
+
+        // Persist enrollment
+        $entityManager->persist($enrollment);
+        $entityManager->flush();
+
+        // Build response
+        $questDto = QuestStartQuestDto::fromEntity($quest, $stepDtos);
+        $responseDto = QuestStartResponseDto::fromEntity($enrollment, $questDto);
+
+        return $this->json($responseDto->toArray(), Response::HTTP_OK);
+    }
+
+    #[Route('/api/quest/{quest_id}/complete', name: 'api_quest_complete', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/quest/{quest_id}/complete',
+        summary: 'Complete a quest',
+        description: 'Receives bulk data from device after quest completion and updates enrollment and step completions',
+        security: [['Bearer' => []]],
+        tags: ['Quest']
+    )]
+    #[OA\Parameter(
+        name: 'quest_id',
+        description: 'Quest UUID',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string', format: 'uuid')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['enrollment_id', 'completed_at', 'steps'],
+            properties: [
+                new OA\Property(
+                    property: 'enrollment_id',
+                    type: 'string',
+                    format: 'uuid',
+                    example: '60000a54-e220-4b17-95c3-ebdfa164caf9',
+                    description: 'Quest enrollment UUID'
+                ),
+                new OA\Property(
+                    property: 'completed_at',
+                    type: 'string',
+                    format: 'date-time',
+                    example: '2025-11-11T15:30:00Z',
+                    description: 'Quest completion timestamp'
+                ),
+                new OA\Property(
+                    property: 'steps',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['step_completion_id', 'status', 'started_at', 'completed_at'],
+                        properties: [
+                            new OA\Property(property: 'step_completion_id', type: 'string', format: 'uuid'),
+                            new OA\Property(property: 'status', type: 'string', enum: ['completed', 'failed', 'skipped']),
+                            new OA\Property(property: 'started_at', type: 'string', format: 'date-time'),
+                            new OA\Property(property: 'completed_at', type: 'string', format: 'date-time'),
+                            new OA\Property(property: 'step_data', type: 'object', nullable: true),
+                            new OA\Property(
+                                property: 'skip_record',
+                                nullable: true,
+                                properties: [
+                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'error_code', type: 'string', nullable: true),
+                                    new OA\Property(property: 'metadata', type: 'object', nullable: true)
+                                ],
+                                type: 'object'
+                            )
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(
+                    property: 'data_file',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(property: 'filename', type: 'string'),
+                        new OA\Property(property: 'size', type: 'number'),
+                        new OA\Property(property: 'checksum', type: 'string')
+                    ],
+                    type: 'object'
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Quest completed successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'enrollment_id', type: 'string', format: 'uuid'),
+                new OA\Property(property: 'points_earned', type: 'number', example: 100),
+                new OA\Property(property: 'completed_at', type: 'string', format: 'date-time')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Bad request - invalid data structure or validation errors',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string'),
+                new OA\Property(property: 'details', type: 'object', nullable: true)
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 403,
+        description: 'Forbidden - enrollment does not belong to authenticated user',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Enrollment not found',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'Conflict - enrollment already completed or abandoned',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string')
+            ]
+        )
+    )]
+    public function completeQuest(
+        string $quest_id,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        ValidatorInterface $validator
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json([
+                'error' => 'Not authenticated'
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Parse request body
+        $data = json_decode($request->getContent(), true);
+        if (!$data) {
+            return $this->json([
+                'error' => 'Invalid JSON data'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Map JSON data to DTO
+        $requestDto = new QuestCompleteRequestDto();
+        $requestDto->enrollment_id = $data['enrollment_id'] ?? null;
+        $requestDto->completed_at = $data['completed_at'] ?? null;
+        $requestDto->steps = [];
+
+        // Map steps
+        if (isset($data['steps']) && is_array($data['steps'])) {
+            foreach ($data['steps'] as $stepData) {
+                $stepDto = new QuestCompleteStepDto();
+                $stepDto->step_completion_id = $stepData['step_completion_id'] ?? null;
+                $stepDto->status = $stepData['status'] ?? null;
+                $stepDto->started_at = $stepData['started_at'] ?? null;
+                $stepDto->completed_at = $stepData['completed_at'] ?? null;
+                $stepDto->step_data = $stepData['step_data'] ?? [];
+
+                // Map skip_record if present
+                if (isset($stepData['skip_record']) && is_array($stepData['skip_record'])) {
+                    $skipRecordDto = new QuestCompleteSkipRecordDto();
+                    $skipRecordDto->message = $stepData['skip_record']['message'] ?? null;
+                    $skipRecordDto->error_code = $stepData['skip_record']['error_code'] ?? null;
+                    $skipRecordDto->metadata = $stepData['skip_record']['metadata'] ?? [];
+                    $stepDto->skip_record = $skipRecordDto;
+                }
+
+                $requestDto->steps[] = $stepDto;
+            }
+        }
+
+        // Map data_file if present
+        if (isset($data['data_file']) && is_array($data['data_file'])) {
+            $dataFileDto = new QuestCompleteDataFileDto();
+            $dataFileDto->filename = $data['data_file']['filename'] ?? null;
+            $dataFileDto->size = $data['data_file']['size'] ?? null;
+            $dataFileDto->checksum = $data['data_file']['checksum'] ?? null;
+            $requestDto->data_file = $dataFileDto;
+        }
+
+        // Validate DTO
+        $errors = $validator->validate($requestDto);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'error' => 'Validation failed',
+                'details' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Begin transaction
+        $entityManager->beginTransaction();
+        try {
+            // 1. Verify enrollment exists
+            $enrollmentUuid = Uuid::fromString($requestDto->enrollment_id);
+            $enrollment = $entityManager->getRepository(QuestEnrollment::class)
+                ->findOneBy(['id' => $enrollmentUuid]);
+
+            if (!$enrollment) {
+                $entityManager->rollback();
+                return $this->json([
+                    'error' => 'Enrollment not found'
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            // 2. Verify enrollment belongs to authenticated user
+            if ($enrollment->getUser()->getId() != $user->getId()) {
+                $entityManager->rollback();
+                return $this->json([
+                    'error' => 'This enrollment does not belong to you'
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            // 3. Verify enrollment status is in_progress
+            if ($enrollment->getStatus() !== QuestEnrollmentStatus::IN_PROGRESS) {
+                $entityManager->rollback();
+                return $this->json([
+                    'error' => 'Enrollment is already ' . $enrollment->getStatus()->value
+                ], Response::HTTP_CONFLICT);
+            }
+
+            // 4. Verify quest_id matches enrollment
+            if ($enrollment->getQuest()->getId()->toString() !== $quest_id) {
+                $entityManager->rollback();
+                return $this->json([
+                    'error' => 'Quest ID does not match enrollment'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // 5. Collect all step completion IDs from request
+            $stepCompletionIds = array_map(
+                fn($step) => Uuid::fromString($step->step_completion_id),
+                $requestDto->steps
+            );
+
+            // 6. Fetch all step completions
+            $stepCompletions = $entityManager->getRepository(QuestStepCompletion::class)
+                ->findBy(['id' => $stepCompletionIds]);
+
+            // 7. Verify all step_completion_ids exist
+            if (count($stepCompletions) !== count($stepCompletionIds)) {
+                $entityManager->rollback();
+                return $this->json([
+                    'error' => 'One or more step completion IDs are invalid'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // 8. Verify all step completions belong to this enrollment
+            foreach ($stepCompletions as $stepCompletion) {
+                if ($stepCompletion->getEnrollment()->getId() != $enrollment->getId()) {
+                    $entityManager->rollback();
+                    return $this->json([
+                        'error' => 'Step completion does not belong to this enrollment'
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+            }
+
+            // 9. Create a map of step completions for easy lookup
+            $stepCompletionMap = [];
+            foreach ($stepCompletions as $stepCompletion) {
+                $stepCompletionMap[$stepCompletion->getId()->toString()] = $stepCompletion;
+            }
+
+            // 10. Track if any critical step failed
+            $hasFailedSteps = false;
+
+            // 11. Update each step completion
+            foreach ($requestDto->steps as $stepDto) {
+                $stepCompletion = $stepCompletionMap[$stepDto->step_completion_id];
+
+                // Map status
+                $status = match($stepDto->status) {
+                    'completed' => QuestStepCompletionStatus::COMPLETED,
+                    'failed' => QuestStepCompletionStatus::FAILED,
+                    'skipped' => QuestStepCompletionStatus::SKIPPED,
+                };
+
+                if ($status === QuestStepCompletionStatus::FAILED) {
+                    $hasFailedSteps = true;
+                }
+
+                // Update step completion
+                $stepCompletion->setStatus($status);
+                $stepCompletion->setStartedAt(new \DateTime($stepDto->started_at));
+                $stepCompletion->setCompletedAt(new \DateTime($stepDto->completed_at));
+                $stepCompletion->setStepData($stepDto->step_data);
+
+                // Create skip record if needed
+                if (in_array($status, [QuestStepCompletionStatus::FAILED, QuestStepCompletionStatus::SKIPPED])) {
+                    if ($stepDto->skip_record) {
+                        $skipRecord = new QuestStepSkipRecord();
+                        $skipRecord->setStepCompletion($stepCompletion);
+                        $skipRecord->setMessage($stepDto->skip_record->message);
+                        $skipRecord->setErrorCode($stepDto->skip_record->error_code);
+                        $skipRecord->setMetadata($stepDto->skip_record->metadata);
+                        $entityManager->persist($skipRecord);
+                    }
+                }
+
+                $entityManager->persist($stepCompletion);
+            }
+
+            // 12. Update enrollment status
+            if ($hasFailedSteps) {
+                $enrollment->setStatus(QuestEnrollmentStatus::FAILED);
+            } else {
+                $enrollment->setStatus(QuestEnrollmentStatus::COMPLETED);
+            }
+
+            // 13. Set completed_at timestamp
+            $enrollment->setCompletedAt(new \DateTime($requestDto->completed_at));
+
+            // 14. Update data_path if data_file provided
+            if ($requestDto->data_file) {
+                // Append filename to existing data_path
+                $currentDataPath = $enrollment->getDataPath();
+                if ($currentDataPath) {
+                    $newDataPath = rtrim($currentDataPath, '/') . '/' . $requestDto->data_file->filename;
+                    $enrollment->setDataPath($newDataPath);
+                }
+            }
+
+            $entityManager->persist($enrollment);
+
+            // 15. Commit transaction
+            $entityManager->flush();
+            $entityManager->commit();
+
+            // 16. Prepare response
+            $response = new QuestCompleteResponseDto(
+                success: true,
+                enrollment_id: $enrollment->getId()->toString(),
+                points_earned: $enrollment->getQuest()->getPoints(),
+                completed_at: $enrollment->getCompletedAt()->format('Y-m-d\TH:i:s\Z')
+            );
+
+            return $this->json($response->toArray(), Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            $entityManager->rollback();
+            return $this->json([
+                'error' => 'Failed to complete quest',
+                'message' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+}
