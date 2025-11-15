@@ -38,17 +38,9 @@ class AuthController extends AbstractController
         description: 'User successfully registered',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
-                new OA\Property(
-                    property: 'user',
-                    properties: [
-                        new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9'),
-                        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
-                        new OA\Property(property: 'name', type: 'string', example: 'John Doe', nullable: true),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2025-11-11 15:28:44')
-                    ],
-                    type: 'object'
-                )
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                new OA\Property(property: 'name', type: 'string', example: 'John Doe', nullable: true),
+                new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...')
             ]
         )
     )]
@@ -116,14 +108,9 @@ class AuthController extends AbstractController
             $token = $jwtManager->create($user);
 
             return $this->json([
-                'message' => 'User registered successfully',
-                'token' => $token,
-                'user' => [
-                    'id' => $user->getId(),
-                    'email' => $user->getEmail(),
-                    'name' => $user->getName(),
-                    'createdAt' => $user->getCreatedAt()?->format('Y-m-d H:i:s')
-                ]
+                'email' => $user->getEmail(),
+                'name' => $user->getName(),
+                'token' => $token
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
             return $this->json([
@@ -155,6 +142,8 @@ class AuthController extends AbstractController
         description: 'Successfully authenticated',
         content: new OA\JsonContent(
             properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                new OA\Property(property: 'name', type: 'string', example: 'John Doe', nullable: true),
                 new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...', description: 'JWT authentication token')
             ]
         )
@@ -190,23 +179,8 @@ class AuthController extends AbstractController
         description: 'User information retrieved successfully',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(
-                    property: 'user',
-                    properties: [
-                        new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '60000a54-e220-4b17-95c3-ebdfa164caf9', description: 'Unique user identifier'),
-                        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com', description: 'User email address'),
-                        new OA\Property(property: 'name', type: 'string', example: 'John Doe', nullable: true, description: 'User full name'),
-                        new OA\Property(
-                            property: 'roles',
-                            type: 'array',
-                            items: new OA\Items(type: 'string'),
-                            example: ['ROLE_USER'],
-                            description: 'User roles'
-                        ),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2025-11-11 15:28:44', description: 'Account creation timestamp')
-                    ],
-                    type: 'object'
-                )
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com', description: 'User email address'),
+                new OA\Property(property: 'name', type: 'string', example: 'John Doe', nullable: true, description: 'User full name')
             ]
         )
     )]
@@ -230,13 +204,8 @@ class AuthController extends AbstractController
         }
 
         return $this->json([
-            'user' => [
-                'id' => $user->getId(),
-                'email' => $user->getEmail(),
-                'name' => $user->getName(),
-                'roles' => $user->getRoles(),
-                'createdAt' => $user->getCreatedAt()?->format('Y-m-d H:i:s')
-            ]
+            'email' => $user->getEmail(),
+            'name' => $user->getName()
         ]);
     }
 }

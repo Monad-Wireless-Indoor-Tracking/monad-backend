@@ -27,5 +27,17 @@ RUN composer install --no-interaction --optimize-autoloader
 # Expose port
 EXPOSE 8000
 
+# Create entrypoint script
+RUN echo '#!/bin/sh\n\
+# Generate JWT keys if they dont exist\n\
+if [ ! -f config/jwt/private.pem ]; then\n\
+    echo "Generating JWT keypair..."\n\
+    php bin/console lexik:jwt:generate-keypair --skip-if-exists\n\
+fi\n\
+\n\
+# Start Symfony server\n\
+exec symfony server:start --no-tls --port=8000 --allow-http --listen-ip=0.0.0.0\n\
+' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Start Symfony server
-CMD ["symfony", "server:start", "--no-tls", "--port=8000", "--allow-http", "--listen-ip=0.0.0.0"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

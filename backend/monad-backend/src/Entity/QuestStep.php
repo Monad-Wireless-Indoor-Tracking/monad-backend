@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: QuestStepRepository::class)]
 #[ORM\Table(name: 'quest_steps')]
-#[ORM\UniqueConstraint(name: 'quest_step_order_idx', columns: ['quest_id', 'order'])]
+#[ORM\UniqueConstraint(name: 'quest_step_order_idx', columns: ['quest_id', '`order`'])]
 #[ORM\HasLifecycleCallbacks]
 class QuestStep
 {
@@ -33,7 +33,7 @@ class QuestStep
     #[Assert\NotNull(message: 'Step type is required')]
     private ?QuestStepType $type = null;
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(name: '`order`', type: Types::INTEGER)]
     #[Assert\NotNull(message: 'Step order is required')]
     #[Assert\PositiveOrZero(message: 'Step order must be a positive number or zero')]
     private ?int $order = null;

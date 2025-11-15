@@ -128,13 +128,13 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                     'email' => [
                                         'type' => 'string',
                                         'format' => 'email',
-                                        'example' => 'user@example.com',
+                                        'example' => 'user1@monad.sk',
                                         'description' => 'User email address',
                                     ],
                                     'password' => [
                                         'type' => 'string',
                                         'format' => 'password',
-                                        'example' => 'securePassword123',
+                                        'example' => 'password123',
                                         'description' => 'User password',
                                     ],
                                 ],
@@ -206,12 +206,12 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                                 'email' => [
                                                     'type' => 'string',
                                                     'format' => 'email',
-                                                    'example' => 'user@example.com',
+                                                    'example' => 'user1@monad.sk',
                                                     'description' => 'User email address',
                                                 ],
                                                 'name' => [
                                                     'type' => 'string',
-                                                    'example' => 'John Doe',
+                                                    'example' => 'User 1',
                                                     'nullable' => true,
                                                     'description' => 'User full name',
                                                 ],
@@ -224,7 +224,7 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                                 'createdAt' => [
                                                     'type' => 'string',
                                                     'format' => 'date-time',
-                                                    'example' => '2025-11-11 15:28:44',
+                                                    'example' => '2025-11-12 16:36:15',
                                                     'description' => 'Account creation timestamp',
                                                 ],
                                             ],

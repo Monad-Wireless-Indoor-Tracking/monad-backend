@@ -1,6 +1,12 @@
 // Quest Management System Database Schema
 
 // Enums
+Enum user_status {
+  active
+  inactive
+  banned
+}
+
 Enum quest_enrollment_status {
   in_progress
   completed
@@ -31,6 +37,7 @@ Table users {
   role varchar[] [not null, default: `'{}'`, note: 'Array of roles']
   name varchar(255) [not null]
   password varchar(255) [not null]
+  status user_status [not null, default: 'active']
   created_at timestamp [not null, default: `now()`]
   updated_at timestamp [not null, default: `now()`]
 }
@@ -79,15 +86,17 @@ Table quest_enrollments {
 }
 
 Table quest_step_completions {
-  id uuid [pk, default: `gen_random_uuid()`]
+  id uuid [pk]
   enrollment_id uuid [ref: > quest_enrollments.id, not null]
   step_id uuid [ref: > quest_steps.id, not null]
   status quest_step_completion_status [not null, default: 'in_progress']
-  created_at timestamp [not null, default: `now()`]
-  completed_at timestamp
-
+  started_at timestamp      // ← ADD: When user actually started
+  completed_at timestamp   
+  created_at timestamp      // ← System record creation
+  step_data jsonb [default: `'{}'`]  // ← ADD: Step-specific
+  
   Indexes {
-    (enrollment_id, step_id) [unique, name: 'enrollment_step_completion_idx']
+    (enrollment_id, step_id) [unique]
   }
 }
 
