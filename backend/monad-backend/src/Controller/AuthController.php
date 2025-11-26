@@ -2,7 +2,11 @@
 
 namespace App\Controller;
 
+use App\Constants\ErrorCode;
 use App\Entity\User;
+use App\Exception\AuthException;
+use App\Exception\SystemException;
+use App\Exception\ValidationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -49,8 +53,8 @@ class AuthController extends AbstractController
         description: 'Bad request - validation errors',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'error', type: 'string', example: 'Validation failed'),
-                new OA\Property(property: 'details', type: 'object')
+                new OA\Property(property: 'code', type: 'string', example: 'VALIDATION_101', description: 'Error code'),
+                new OA\Property(property: 'message', type: 'string', example: 'Email address format is invalid', description: 'Human-readable error message')
             ]
         )
     )]
@@ -63,17 +67,18 @@ class AuthController extends AbstractController
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
-        if (!isset($data['email']) || !isset($data['password'])) {
-            return $this->json([
-                'error' => 'Email and password are required'
-            ], Response::HTTP_BAD_REQUEST);
+        // Validate required fields
+        if (!isset($data['email'])) {
+            throw new ValidationException(ErrorCode::VALIDATION_EMAIL_REQUIRED);
+        }
+
+        if (!isset($data['password'])) {
+            throw new ValidationException(ErrorCode::VALIDATION_PASSWORD_REQUIRED);
         }
 
         // Validate email format
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            return $this->json([
-                'error' => 'Invalid email format'
-            ], Response::HTTP_BAD_REQUEST);
+            throw new ValidationException(ErrorCode::VALIDATION_EMAIL_INVALID);
         }
 
         $user = new User();
@@ -90,14 +95,21 @@ class AuthController extends AbstractController
         // Validate the user
         $errors = $validator->validate($user);
         if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json([
-                'error' => 'Validation failed',
-                'details' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+            $firstError = $errors->get(0);
+            $fieldName = $firstError->getPropertyPath();
+            $message = $firstError->getMessage();
+
+            // Map validation errors to error codes
+            $code = match ($fieldName) {
+                'email' => str_contains($message, 'already')
+                    ? ErrorCode::AUTH_EMAIL_ALREADY_EXISTS
+                    : ErrorCode::VALIDATION_EMAIL_INVALID,
+                'password' => ErrorCode::VALIDATION_PASSWORD_TOO_SHORT,
+                'name' => ErrorCode::VALIDATION_NAME_TOO_LONG,
+                default => ErrorCode::VALIDATION_FAILED,
+            };
+
+            throw new ValidationException($code);
         }
 
         try {
@@ -113,10 +125,12 @@ class AuthController extends AbstractController
                 'token' => $token
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Registration failed',
-                'message' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            // Check if it's a duplicate email error
+            if (str_contains($e->getMessage(), 'Duplicate entry') || str_contains($e->getMessage(), 'unique constraint')) {
+                throw new AuthException(ErrorCode::AUTH_EMAIL_ALREADY_EXISTS, Response::HTTP_BAD_REQUEST);
+            }
+
+            throw new SystemException(ErrorCode::SYSTEM_INTERNAL_ERROR);
         }
     }
 
@@ -153,8 +167,18 @@ class AuthController extends AbstractController
         description: 'Unauthorized - invalid credentials',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'code', type: 'integer', example: 401),
-                new OA\Property(property: 'message', type: 'string', example: 'Invalid credentials')
+                new OA\Property(property: 'code', type: 'string', example: 'AUTH_001', description: 'Error code'),
+                new OA\Property(property: 'message', type: 'string', example: 'Invalid email or password', description: 'Human-readable error message')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Bad request - validation errors',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'code', type: 'string', example: 'VALIDATION_100', description: 'Error code'),
+                new OA\Property(property: 'message', type: 'string', example: 'Email address is required', description: 'Human-readable error message')
             ]
         )
     )]
@@ -189,7 +213,8 @@ class AuthController extends AbstractController
         description: 'Unauthorized - missing or invalid token',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'error', type: 'string', example: 'Not authenticated')
+                new OA\Property(property: 'code', type: 'string', example: 'AUTH_006', description: 'Error code'),
+                new OA\Property(property: 'message', type: 'string', example: 'Authentication required', description: 'Human-readable error message')
             ]
         )
     )]
@@ -198,9 +223,7 @@ class AuthController extends AbstractController
         $user = $this->getUser();
 
         if (!$user instanceof User) {
-            return $this->json([
-                'error' => 'Not authenticated'
-            ], Response::HTTP_UNAUTHORIZED);
+            throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
         }
 
         return $this->json([

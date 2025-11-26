@@ -101,26 +101,8 @@ This document defines the configuration structure for different types of quest s
 1. User taps "Start Scanning" button
 2. App starts BLE scan in background
 3. Device with matching `device_id` is detected
-4. RSSI is above `rssi_threshold` (if specified)
-5. Device remains detected for `detection_duration` seconds
-6. Step marked as completed
-
-**UI During Scan:**
-- Show "Searching..." with animated indicator
-- Display RSSI strength meter when device is detected but below threshold
-- Show countdown when device is detected and above threshold
-- Button changes to "Cancel Scan" (allows user to stop)
-
-**Auto-completion:**
-- If device is detected immediately when step starts, auto-complete after `detection_duration`
-
-**Data Collected:**
-- Timestamp of detection
-- RSSI values (multiple samples during detection period)
-- Detection duration
-- GPS coordinates (if available)
-- All BLE advertisements received during scan
-
+4. Based on signal strenght, the approximate distance is calculated - this is showm inside of the box to the user alons with a color identifier, that represents how close user is to BLE. 
+5. Step marked as completed
 ---
 
 ## 3. Wait Step
@@ -138,8 +120,6 @@ This document defines the configuration structure for different types of quest s
   "description": "Please remain stationary for 30 seconds while we collect data",
   "config": {
     "timeout_seconds": 30,
-    "allow_background": false,
-    "instructions": "Stand still in your current position. Do not move until the timer completes."
   }
 }
 ```
@@ -152,24 +132,15 @@ This document defines the configuration structure for different types of quest s
 | `name` | string | Yes | Step name/title shown to user |
 | `description` | string | Yes | Brief description of what to do during wait |
 | `config.timeout_seconds` | integer | Yes | Duration to wait in seconds |
-| `config.allow_background` | boolean | No | Allow app to go to background (default: false) |
-| `config.instructions` | string | No | Additional instructions for the wait period |
 
 ### App Behavior
-
-**Button Text:** `"Start Timer"` (before starting) � `"Waiting..."` (during countdown)
+- During the timer - show warning to not close the app while running.
 
 **Completion Criteria:**
-1. User taps "Start Timer" button
+1. Timer automatically starts when step is marked as completed
 2. Countdown timer starts from `timeout_seconds`
 3. Timer counts down to 0
-4. Step marked as completed
-
-**UI During Wait:**
-- Large countdown display (e.g., "0:30" � "0:00")
-- Progress circle/bar showing time remaining
-- If `allow_background: false`, show warning if user tries to leave app
-- Optional: Pause button (timer can be paused and resumed)
+4. Step marked as completed automatically
 
 **Auto-start Option:**
 - Can be configured to start automatically when step is reached
@@ -195,10 +166,6 @@ This document defines the configuration structure for different types of quest s
   "type": "text_box",
   "name": "Welcome to the experiment",
   "description": "You are about to participate in a BLE positioning experiment. During this quest, you will:\n\n1. Visit multiple locations\n2. Scan QR codes\n3. Stand near BLE beacons\n\nPlease keep your phone's Bluetooth enabled throughout the experiment.",
-  "config": {
-    "allow_skip": true,
-    "button_text": "I Understand"
-  }
 }
 ```
 
@@ -209,32 +176,18 @@ This document defines the configuration structure for different types of quest s
 | `type` | string | Yes | Must be `"text_box"` |
 | `name` | string | Yes | Step title/heading shown to user |
 | `description` | string | Yes | Full text content to display (supports markdown) |
-| `config.allow_skip` | boolean | No | Allow skipping without reading (default: true) |
-| `config.button_text` | string | No | Custom button text (default: "Continue") |
 
 ### App Behavior
 
-**Button Text:** `{config.button_text}` or `"Continue"` (default)
+**Button Text:** `"Continue"` (default)
 
 **Completion Criteria:**
 1. User taps the button
 2. Step marked as completed
 
-**UI Display:**
-- Show `name` as heading
-- Show `description` in scrollable text area (supports markdown formatting)
-- If text is long, require scroll to bottom before enabling button (optional)
-- If `allow_skip: true`, show small "Skip" link
-
-**Skipping:**
-- If `allow_skip: true`, show secondary "Skip" button/link
-- Skipped steps are still marked as completed but with `skipped: true` flag
 
 **Data Collected:**
-- Timestamp of acknowledgment
-- Time spent on screen (reading duration)
-- Whether step was skipped
-- Scroll depth (if applicable)
+- Timestamp of Continue tapped
 
 ---
 

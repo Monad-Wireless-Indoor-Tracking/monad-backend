@@ -2,9 +2,9 @@
 
 namespace App\EventListener;
 
+use App\Constants\ErrorCode;
+use App\Exception\ValidationException;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -23,35 +23,27 @@ class LoginRequestValidationListener
         $data = json_decode($request->getContent(), true);
 
         // Validate required fields
-        if (!isset($data['email']) || !isset($data['password'])) {
-            $event->setResponse(new JsonResponse([
-                'error' => 'Email and password are required'
-            ], Response::HTTP_BAD_REQUEST));
-            return;
+        if (!isset($data['email'])) {
+            throw new ValidationException(ErrorCode::VALIDATION_EMAIL_REQUIRED);
+        }
+
+        if (!isset($data['password'])) {
+            throw new ValidationException(ErrorCode::VALIDATION_PASSWORD_REQUIRED);
         }
 
         // Validate email format
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            $event->setResponse(new JsonResponse([
-                'error' => 'Invalid email format'
-            ], Response::HTTP_BAD_REQUEST));
-            return;
+            throw new ValidationException(ErrorCode::VALIDATION_EMAIL_INVALID);
         }
 
         // Validate email length
         if (strlen($data['email']) > 180) {
-            $event->setResponse(new JsonResponse([
-                'error' => 'Email cannot be longer than 180 characters'
-            ], Response::HTTP_BAD_REQUEST));
-            return;
+            throw new ValidationException(ErrorCode::VALIDATION_EMAIL_TOO_LONG);
         }
 
         // Validate password is not empty
         if (empty(trim($data['password']))) {
-            $event->setResponse(new JsonResponse([
-                'error' => 'Password cannot be empty'
-            ], Response::HTTP_BAD_REQUEST));
-            return;
+            throw new ValidationException(ErrorCode::VALIDATION_PASSWORD_EMPTY);
         }
     }
 }

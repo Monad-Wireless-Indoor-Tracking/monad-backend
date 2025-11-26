@@ -73,37 +73,98 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'message' => ['type' => 'string', 'example' => 'User registered successfully'],
+                                        'email' => ['type' => 'string', 'format' => 'email', 'example' => 'user@example.com'],
+                                        'name' => ['type' => 'string', 'example' => 'John Doe', 'nullable' => true],
                                         'token' => ['type' => 'string', 'example' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...', 'description' => 'JWT authentication token'],
-                                        'user' => [
-                                            'type' => 'object',
-                                            'properties' => [
-                                                'id' => ['type' => 'string', 'format' => 'uuid', 'example' => '60000a54-e220-4b17-95c3-ebdfa164caf9'],
-                                                'email' => ['type' => 'string', 'format' => 'email', 'example' => 'user@example.com'],
-                                                'name' => ['type' => 'string', 'example' => 'John Doe', 'nullable' => true],
-                                                'createdAt' => ['type' => 'string', 'format' => 'date-time', 'example' => '2025-11-11 15:28:44'],
-                                            ],
-                                        ],
                                     ],
                                 ])
                             ),
                         ])
                     ),
                     '400' => new Response(
-                        description: 'Bad request - validation errors',
+                        description: 'Bad request - validation errors
+
+<table>
+  <thead>
+    <tr>
+      <th>Error Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>VALIDATION_100</code></td>
+      <td>Email address is required</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_101</code></td>
+      <td>Email address format is invalid</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_103</code></td>
+      <td>Password is required</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_107</code></td>
+      <td>Name is too long (max 255 characters)</td>
+    </tr>
+    <tr>
+      <td><code>AUTH_007</code></td>
+      <td>Email address already registered</td>
+    </tr>
+  </tbody>
+</table>',
                         content: new \ArrayObject([
                             'application/json' => new MediaType(
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'error' => ['type' => 'string', 'example' => 'Validation failed'],
-                                        'details' => ['type' => 'object'],
+                                        'code' => [
+                                            'type' => 'string',
+                                            'example' => 'VALIDATION_101',
+                                            'description' => 'Error code',
+                                            'enum' => ['VALIDATION_100', 'VALIDATION_101', 'VALIDATION_103', 'VALIDATION_107', 'AUTH_007']
+                                        ],
+                                        'message' => ['type' => 'string', 'example' => 'Email address format is invalid', 'description' => 'Human-readable error message'],
                                     ],
                                 ])
                             ),
                         ])
                     ),
-                    '500' => new Response(description: 'Internal server error'),
+                    '500' => new Response(
+                        description: 'Internal server error
+
+<table>
+  <thead>
+    <tr>
+      <th>Error Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>SYSTEM_900</code></td>
+      <td>Internal server error</td>
+    </tr>
+  </tbody>
+</table>',
+                        content: new \ArrayObject([
+                            'application/json' => new MediaType(
+                                schema: new \ArrayObject([
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'code' => [
+                                            'type' => 'string',
+                                            'example' => 'SYSTEM_900',
+                                            'description' => 'Error code',
+                                            'enum' => ['SYSTEM_900']
+                                        ],
+                                        'message' => ['type' => 'string', 'example' => 'Internal server error', 'description' => 'Human-readable error message'],
+                                    ],
+                                ])
+                            ),
+                        ])
+                    ),
                 ],
                 security: []
             )
@@ -150,25 +211,93 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'token' => [
-                                            'type' => 'string',
-                                            'example' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...',
-                                            'description' => 'JWT authentication token',
-                                        ],
+                                        'email' => ['type' => 'string', 'format' => 'email', 'example' => 'user@example.com'],
+                                        'name' => ['type' => 'string', 'example' => 'John Doe', 'nullable' => true],
+                                        'token' => ['type' => 'string', 'example' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...', 'description' => 'JWT authentication token'],
                                     ],
                                 ])
                             ),
                         ])
                     ),
                     '401' => new Response(
-                        description: 'Unauthorized - invalid credentials',
+                        description: 'Unauthorized - invalid credentials
+
+<table>
+  <thead>
+    <tr>
+      <th>Error Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>AUTH_001</code></td>
+      <td>Invalid email or password</td>
+    </tr>
+  </tbody>
+</table>',
                         content: new \ArrayObject([
                             'application/json' => new MediaType(
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'code' => ['type' => 'integer', 'example' => 401],
-                                        'message' => ['type' => 'string', 'example' => 'Invalid credentials'],
+                                        'code' => [
+                                            'type' => 'string',
+                                            'example' => 'AUTH_001',
+                                            'description' => 'Error code',
+                                            'enum' => ['AUTH_001']
+                                        ],
+                                        'message' => ['type' => 'string', 'example' => 'Invalid email or password', 'description' => 'Human-readable error message'],
+                                    ],
+                                ])
+                            ),
+                        ])
+                    ),
+                    '400' => new Response(
+                        description: 'Bad request - validation errors
+
+<table>
+  <thead>
+    <tr>
+      <th>Error Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>VALIDATION_100</code></td>
+      <td>Email address is required</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_101</code></td>
+      <td>Email address format is invalid</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_102</code></td>
+      <td>Email address is too long (max 180 characters)</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_103</code></td>
+      <td>Password is required</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATION_104</code></td>
+      <td>Password cannot be empty</td>
+    </tr>
+  </tbody>
+</table>',
+                        content: new \ArrayObject([
+                            'application/json' => new MediaType(
+                                schema: new \ArrayObject([
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'code' => [
+                                            'type' => 'string',
+                                            'example' => 'VALIDATION_100',
+                                            'description' => 'Error code',
+                                            'enum' => ['VALIDATION_100', 'VALIDATION_101', 'VALIDATION_102', 'VALIDATION_103', 'VALIDATION_104']
+                                        ],
+                                        'message' => ['type' => 'string', 'example' => 'Email address is required', 'description' => 'Human-readable error message'],
                                     ],
                                 ])
                             ),
@@ -194,54 +323,50 @@ readonly class AuthDecorator implements OpenApiFactoryInterface
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'user' => [
-                                            'type' => 'object',
-                                            'properties' => [
-                                                'id' => [
-                                                    'type' => 'string',
-                                                    'format' => 'uuid',
-                                                    'example' => '60000a54-e220-4b17-95c3-ebdfa164caf9',
-                                                    'description' => 'Unique user identifier',
-                                                ],
-                                                'email' => [
-                                                    'type' => 'string',
-                                                    'format' => 'email',
-                                                    'example' => 'user1@monad.sk',
-                                                    'description' => 'User email address',
-                                                ],
-                                                'name' => [
-                                                    'type' => 'string',
-                                                    'example' => 'User 1',
-                                                    'nullable' => true,
-                                                    'description' => 'User full name',
-                                                ],
-                                                'roles' => [
-                                                    'type' => 'array',
-                                                    'items' => ['type' => 'string'],
-                                                    'example' => ['ROLE_USER'],
-                                                    'description' => 'User roles',
-                                                ],
-                                                'createdAt' => [
-                                                    'type' => 'string',
-                                                    'format' => 'date-time',
-                                                    'example' => '2025-11-12 16:36:15',
-                                                    'description' => 'Account creation timestamp',
-                                                ],
-                                            ],
-                                        ],
+                                        'email' => ['type' => 'string', 'format' => 'email', 'example' => 'user@example.com', 'description' => 'User email address'],
+                                        'name' => ['type' => 'string', 'example' => 'John Doe', 'nullable' => true, 'description' => 'User full name'],
                                     ],
                                 ])
                             ),
                         ])
                     ),
                     '401' => new Response(
-                        description: 'Unauthorized - missing or invalid token',
+                        description: 'Unauthorized - missing or invalid token
+
+<table>
+  <thead>
+    <tr>
+      <th>Error Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>AUTH_006</code></td>
+      <td>Authentication required</td>
+    </tr>
+    <tr>
+      <td><code>AUTH_004</code></td>
+      <td>Authentication token has expired</td>
+    </tr>
+    <tr>
+      <td><code>AUTH_005</code></td>
+      <td>Authentication token is invalid</td>
+    </tr>
+  </tbody>
+</table>',
                         content: new \ArrayObject([
                             'application/json' => new MediaType(
                                 schema: new \ArrayObject([
                                     'type' => 'object',
                                     'properties' => [
-                                        'error' => ['type' => 'string', 'example' => 'Not authenticated'],
+                                        'code' => [
+                                            'type' => 'string',
+                                            'example' => 'AUTH_006',
+                                            'description' => 'Error code',
+                                            'enum' => ['AUTH_006', 'AUTH_004', 'AUTH_005']
+                                        ],
+                                        'message' => ['type' => 'string', 'example' => 'Authentication required', 'description' => 'Human-readable error message'],
                                     ],
                                 ])
                             ),
