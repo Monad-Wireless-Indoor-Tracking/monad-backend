@@ -39,6 +39,13 @@ class ErrorCode
     public const RESOURCE_ALREADY_EXISTS = 'RESOURCE_201';
     public const RESOURCE_FORBIDDEN = 'RESOURCE_202';
 
+    // Storage Errors (300-399)
+    public const STORAGE_UPLOAD_FAILED = 'STORAGE_300';
+    public const STORAGE_FILE_TOO_LARGE = 'STORAGE_301';
+    public const STORAGE_INVALID_FILE_TYPE = 'STORAGE_302';
+    public const STORAGE_FILENAME_REQUIRED = 'STORAGE_303';
+    public const STORAGE_S3_UNAVAILABLE = 'STORAGE_304';
+
     // System Errors (900-999)
     public const SYSTEM_INTERNAL_ERROR = 'SYSTEM_900';
     public const SYSTEM_DATABASE_ERROR = 'SYSTEM_901';
@@ -71,6 +78,12 @@ class ErrorCode
             self::RESOURCE_NOT_FOUND => 'Requested resource not found',
             self::RESOURCE_ALREADY_EXISTS => 'Resource already exists',
             self::RESOURCE_FORBIDDEN => 'Access to resource is forbidden',
+
+            self::STORAGE_UPLOAD_FAILED => 'File upload failed',
+            self::STORAGE_FILE_TOO_LARGE => 'File size exceeds maximum allowed (50 MB)',
+            self::STORAGE_INVALID_FILE_TYPE => 'File type is not allowed',
+            self::STORAGE_FILENAME_REQUIRED => 'Filename is required',
+            self::STORAGE_S3_UNAVAILABLE => 'Storage service is temporarily unavailable',
 
             self::SYSTEM_INTERNAL_ERROR => 'Internal server error',
             self::SYSTEM_DATABASE_ERROR => 'Database operation failed',

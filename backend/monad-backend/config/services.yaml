@@ -23,6 +23,15 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
+    # S3 Service configuration
+    App\Service\S3Service:
+        arguments:
+            $awsRegion: '%env(AWS_S3_REGION)%'
+            $awsBucket: '%env(AWS_S3_BUCKET)%'
+            $awsAccessKeyId: '%env(AWS_S3_ACCESS_KEY_ID)%'
+            $awsSecretAccessKey: '%env(AWS_S3_SECRET_ACCESS_KEY)%'
+            $presignedUrlExpiry: '%env(AWS_S3_PRESIGNED_URL_EXPIRY)%'
+
     # OpenAPI Decorators - chained in order
     # AuthDecorator wraps the base OpenApiFactory
     App\OpenApi\AuthDecorator:
@@ -33,3 +42,8 @@ services:
     App\OpenApi\QuestDecorator:
         decorates: 'App\OpenApi\AuthDecorator'
         arguments: ['@App\OpenApi\QuestDecorator.inner']
+
+    # StorageDecorator wraps QuestDecorator
+    App\OpenApi\StorageDecorator:
+        decorates: 'App\OpenApi\QuestDecorator'
+        arguments: ['@App\OpenApi\StorageDecorator.inner']

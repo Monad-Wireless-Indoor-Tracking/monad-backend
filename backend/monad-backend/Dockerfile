@@ -1,4 +1,4 @@
-FROM php:8.2-cli
+FROM php:8.3-cli
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -7,6 +7,11 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libzip-dev \
     && docker-php-ext-install pdo pdo_pgsql zip
+
+# Configure PHP for larger file uploads
+RUN echo "upload_max_filesize = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "post_max_size = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "memory_limit = 128M" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

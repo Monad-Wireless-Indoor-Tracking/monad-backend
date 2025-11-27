@@ -1034,6 +1034,391 @@
                 "security": []
             }
         },
+        "/api/storage/config": {
+            "get": {
+                "tags": [
+                    "Storage"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Storage configuration",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "maxFileSize": {
+                                            "type": "integer",
+                                            "example": 10485760,
+                                            "description": "Maximum file size in bytes"
+                                        },
+                                        "maxFileSizeMB": {
+                                            "type": "integer",
+                                            "example": 10,
+                                            "description": "Maximum file size in megabytes"
+                                        },
+                                        "allowedContentTypes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "example": [
+                                                "application/octet-stream",
+                                                "application/json",
+                                                "text/csv",
+                                                "text/plain"
+                                            ],
+                                            "description": "List of allowed MIME types"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "AUTH_006"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Authentication required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Get storage configuration",
+                "description": "Returns the storage service configuration including allowed file types and size limits",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/api/storage/test": {
+            "get": {
+                "tags": [
+                    "Storage"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Connection test result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "bucket": {
+                                            "type": "string",
+                                            "example": "my-bucket"
+                                        },
+                                        "region": {
+                                            "type": "string",
+                                            "example": "eu-central-1"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Successfully connected to S3 bucket"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "AUTH_006"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Authentication required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Test S3 connection",
+                "description": "Tests the connection to the configured S3 bucket. Use this to verify your S3 configuration is correct.",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/api/storage/upload": {
+            "post": {
+                "tags": [
+                    "Storage"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File uploaded successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "objectKey": {
+                                            "type": "string",
+                                            "example": "uploads/550e8400-e29b-41d4-a716-446655440000/a1b2c3d4/ble_data.csv",
+                                            "description": "S3 object key where the file was stored"
+                                        },
+                                        "url": {
+                                            "type": "string",
+                                            "example": "https://bucket.s3.region.amazonaws.com/uploads/...",
+                                            "description": "URL of the uploaded file"
+                                        },
+                                        "size": {
+                                            "type": "integer",
+                                            "example": 1048576,
+                                            "description": "File size in bytes"
+                                        },
+                                        "contentType": {
+                                            "type": "string",
+                                            "example": "text/csv",
+                                            "description": "MIME type of the uploaded file"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "STORAGE_301"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "File size exceeds maximum allowed (10 MB)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "AUTH_006"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Authentication required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Upload failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "STORAGE_300"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "File upload failed"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Upload file to S3",
+                "description": "Uploads a file directly to S3. The file is streamed to S3 without being stored on the backend server. Max file size: 10 MB. Allowed types: application/octet-stream, application/json, text/csv, text/plain",
+                "requestBody": {
+                    "description": "File to upload",
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "file"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "File to upload (max 10 MB)"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/api/storage/upload-url": {
+            "post": {
+                "tags": [
+                    "Storage"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pre-signed URL generated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "uploadUrl": {
+                                            "type": "string",
+                                            "example": "https://bucket.s3.region.amazonaws.com/uploads/...?X-Amz-...",
+                                            "description": "Pre-signed URL for uploading. Use HTTP PUT with the file content."
+                                        },
+                                        "objectKey": {
+                                            "type": "string",
+                                            "example": "uploads/550e8400-e29b-41d4-a716-446655440000/a1b2c3d4/ble_data.csv",
+                                            "description": "S3 object key where the file will be stored"
+                                        },
+                                        "expiresAt": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "example": "2024-01-15T10:30:00+00:00",
+                                            "description": "URL expiration timestamp (ISO 8601)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "STORAGE_301"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "File size exceeds maximum allowed (10 MB)"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "AUTH_006"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Authentication required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Get pre-signed URL for S3 upload",
+                "description": "Generates a pre-signed URL that allows direct upload to S3. The client should use this URL to upload the file directly to S3 using a PUT request.",
+                "requestBody": {
+                    "description": "File metadata for pre-signed URL generation",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "filename",
+                                    "contentType",
+                                    "fileSize"
+                                ],
+                                "properties": {
+                                    "filename": {
+                                        "type": "string",
+                                        "example": "ble_data_2024.csv",
+                                        "description": "Original filename"
+                                    },
+                                    "contentType": {
+                                        "type": "string",
+                                        "example": "text/csv",
+                                        "description": "MIME type of the file"
+                                    },
+                                    "fileSize": {
+                                        "type": "integer",
+                                        "example": 1048576,
+                                        "description": "File size in bytes (max 10 MB)"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
         "/api/auth/me": {
             "get": {
                 "tags": [
@@ -1130,6 +1515,10 @@
         {
             "name": "Quest",
             "description": "Quest management and enrollment endpoints"
+        },
+        {
+            "name": "Storage",
+            "description": "S3 file storage endpoints for BLE data uploads"
         }
     ],
     "webhooks": {}
