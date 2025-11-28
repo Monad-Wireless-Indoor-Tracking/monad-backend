@@ -237,6 +237,70 @@ class S3Service
     }
 
     /**
+     * Stream upload directly from php://input to S3 (no temp file)
+     *
+     * Client must send raw binary body (not multipart/form-data)
+     *
+     * @param string $filename Filename from header
+     * @param string $contentType Content-Type from header
+     * @param int $contentLength Content-Length from header
+     * @param string $userId User ID for organizing uploads
+     * @return array{success: bool, objectKey: string, url: string, size: int}
+     */
+    public function directStreamUpload(
+        string $filename,
+        string $contentType,
+        int $contentLength,
+        string $userId,
+    ): array {
+        $this->validateUploadRequest($filename, $contentType, $contentLength);
+
+        // Generate unique object key
+        $objectKey = sprintf(
+            'uploads/%s/%s/%s',
+            $userId,
+            Uuid::v4()->toRfc4122(),
+            $this->sanitizeFilename($filename)
+        );
+
+        try {
+            // Open php://input as a stream - this reads directly from request body
+            // No temp file is created!
+            $inputStream = fopen('php://input', 'rb');
+
+            $result = $this->s3Client->putObject([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'Body' => $inputStream,
+                'ContentType' => $contentType,
+                'ContentLength' => $contentLength,
+            ]);
+
+            if (is_resource($inputStream)) {
+                fclose($inputStream);
+            }
+
+            return [
+                'success' => true,
+                'objectKey' => $objectKey,
+                'url' => $result['ObjectURL'] ?? sprintf(
+                    'https://%s.s3.%s.amazonaws.com/%s',
+                    $this->bucket,
+                    $this->region,
+                    $objectKey
+                ),
+                'size' => $contentLength,
+                'contentType' => $contentType,
+            ];
+        } catch (AwsException $e) {
+            throw new SystemException(
+                ErrorCode::STORAGE_UPLOAD_FAILED,
+                previous: $e
+            );
+        }
+    }
+
+    /**
      * Get the maximum allowed file size in bytes
      */
     public function getMaxFileSize(): int

@@ -7,6 +7,7 @@ namespace App\OpenApi;
 use ApiPlatform\OpenApi\Factory\OpenApiFactoryInterface;
 use ApiPlatform\OpenApi\Model\MediaType;
 use ApiPlatform\OpenApi\Model\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use ApiPlatform\OpenApi\Model\PathItem;
 use ApiPlatform\OpenApi\Model\RequestBody;
 use ApiPlatform\OpenApi\Model\Response;
@@ -111,27 +112,29 @@ readonly class StorageDecorator implements OpenApiFactoryInterface
         );
         $paths->addPath('/api/storage/config', $configPath);
 
-        // Add /api/storage/upload POST - Upload file to S3
+        // Add /api/storage/upload POST - Upload file to S3 (direct stream)
         $uploadPath = new PathItem(
             post: new Operation(
                 tags: ['Storage'],
-                summary: 'Upload file to S3',
-                description: 'Uploads a file directly to S3. The file is streamed to S3 without being stored on the backend server. Max file size: 10 MB. Allowed types: application/octet-stream, application/json, text/csv, text/plain',
+                summary: 'Upload file to S3 (direct stream)',
+                description: 'Uploads a file directly to S3 by streaming from request body. NO temp file is created on the backend. Send raw binary body with X-Filename header. Max file size: 50 MB.',
+                parameters: [
+                    new Parameter(
+                        name: 'X-Filename',
+                        in: 'header',
+                        description: 'Original filename (required)',
+                        required: true,
+                        schema: ['type' => 'string', 'example' => 'ble_data.csv']
+                    ),
+                ],
                 requestBody: new RequestBody(
-                    description: 'File to upload',
+                    description: 'Raw binary file content (NOT multipart/form-data)',
                     required: true,
                     content: new \ArrayObject([
-                        'multipart/form-data' => new MediaType(
+                        'application/octet-stream' => new MediaType(
                             schema: new \ArrayObject([
-                                'type' => 'object',
-                                'required' => ['file'],
-                                'properties' => [
-                                    'file' => [
-                                        'type' => 'string',
-                                        'format' => 'binary',
-                                        'description' => 'File to upload (max 10 MB)',
-                                    ],
-                                ],
+                                'type' => 'string',
+                                'format' => 'binary',
                             ])
                         ),
                     ])

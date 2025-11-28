@@ -208,26 +208,23 @@ class S3Controller extends AbstractController
     #[Route('/api/storage/upload', name: 'api_storage_upload', methods: ['POST'])]
     #[OA\Post(
         path: '/api/storage/upload',
-        summary: 'Upload file to S3',
-        description: 'Uploads a file directly to S3. The file is streamed to S3 without being stored on the backend server.',
+        summary: 'Upload file to S3 (direct stream)',
+        description: 'Uploads a file directly to S3 by streaming from request body. NO temp file is created on the backend. Send raw binary body with required headers.',
         security: [['Bearer' => []]],
         tags: ['Storage']
     )]
+    #[OA\Header(
+        header: 'X-Filename',
+        description: 'Original filename',
+        required: true,
+        schema: new OA\Schema(type: 'string', example: 'ble_data.csv')
+    )]
     #[OA\RequestBody(
         required: true,
+        description: 'Raw binary file content (NOT multipart/form-data)',
         content: new OA\MediaType(
-            mediaType: 'multipart/form-data',
-            schema: new OA\Schema(
-                required: ['file'],
-                properties: [
-                    new OA\Property(
-                        property: 'file',
-                        type: 'string',
-                        format: 'binary',
-                        description: 'File to upload (max 10 MB)'
-                    )
-                ]
-            )
+            mediaType: 'application/octet-stream',
+            schema: new OA\Schema(type: 'string', format: 'binary')
         )
     )]
     #[OA\Response(
@@ -249,7 +246,7 @@ class S3Controller extends AbstractController
                     description: 'URL of the uploaded file'
                 ),
                 new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),
-                new OA\Property(property: 'contentType', type: 'string', example: 'text/csv', description: 'MIME type')
+                new OA\Property(property: 'contentType', type: 'string', example: 'application/octet-stream', description: 'MIME type')
             ]
         )
     )]
@@ -259,7 +256,7 @@ class S3Controller extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'code', type: 'string', example: 'STORAGE_301'),
-                new OA\Property(property: 'message', type: 'string', example: 'File size exceeds maximum allowed (10 MB)')
+                new OA\Property(property: 'message', type: 'string', example: 'File size exceeds maximum allowed (50 MB)')
             ]
         )
     )]
@@ -291,51 +288,28 @@ class S3Controller extends AbstractController
             throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
         }
 
-        // Check if PHP rejected the upload due to size limits
-        $contentLength = $request->headers->get('Content-Length');
-        $postMaxSize = $this->getPostMaxSizeBytes();
-        if ($contentLength && (int) $contentLength > $postMaxSize) {
-            throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
-        }
+        // Get metadata from headers
+        $filename = $request->headers->get('X-Filename');
+        $contentType = $request->headers->get('Content-Type', 'application/octet-stream');
+        $contentLength = (int) $request->headers->get('Content-Length', 0);
 
-        $file = $request->files->get('file');
-
-        if (!$file) {
-            // Check if upload failed due to PHP limits
-            if ($request->server->get('CONTENT_LENGTH') > 0 && empty($_FILES) && empty($_POST)) {
-                throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
-            }
+        if (!$filename) {
             throw new ValidationException(ErrorCode::STORAGE_FILENAME_REQUIRED);
         }
 
-        // Check for upload errors
-        if ($file->getError() !== UPLOAD_ERR_OK) {
-            if ($file->getError() === UPLOAD_ERR_INI_SIZE || $file->getError() === UPLOAD_ERR_FORM_SIZE) {
-                throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
-            }
-            throw new ValidationException(ErrorCode::STORAGE_UPLOAD_FAILED);
+        if ($contentLength <= 0) {
+            throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
         }
 
-        $result = $this->s3Service->streamUpload(
-            file: $file,
+        // Direct stream from php://input to S3 - no temp file!
+        $result = $this->s3Service->directStreamUpload(
+            filename: $filename,
+            contentType: $contentType,
+            contentLength: $contentLength,
             userId: $user->getId()->toRfc4122(),
         );
 
         return $this->json($result, Response::HTTP_OK);
-    }
-
-    private function getPostMaxSizeBytes(): int
-    {
-        $val = ini_get('post_max_size');
-        $val = trim($val);
-        $last = strtolower($val[strlen($val) - 1]);
-        $val = (int) $val;
-        switch ($last) {
-            case 'g': $val *= 1024;
-            case 'm': $val *= 1024;
-            case 'k': $val *= 1024;
-        }
-        return $val;
     }
 
     #[Route('/api/storage/test', name: 'api_storage_test', methods: ['GET'])]
