@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     && docker-php-ext-install pdo pdo_pgsql zip
 
-# Configure PHP for larger file uploads
+# Configure PHP
 RUN echo "upload_max_filesize = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "post_max_size = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
-    echo "memory_limit = 128M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "max_input_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini
 
@@ -28,8 +28,10 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . .
 
-# Install dependencies
-RUN composer install --no-interaction --optimize-autoloader
+# Install dependencies (production mode, skip scripts that need DB)
+ENV APP_ENV=prod
+RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts && \
+    composer dump-autoload --optimize
 
 # Expose port
 EXPOSE 8000
