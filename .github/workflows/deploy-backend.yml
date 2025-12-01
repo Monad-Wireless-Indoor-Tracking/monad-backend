@@ -1,29 +1,23 @@
-name: Deploy Backend to AWS ECS
+name: Deploy Backend
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'backend/monad-backend/**'
-      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
 env:
   AWS_REGION: eu-north-1
   ECR_REPOSITORY: monad-backend
-  ECS_SERVICE: monad-backend-service
+  ECS_SERVICE: monad-backend
   ECS_CLUSTER: monad-cluster
-  CONTAINER_NAME: monad-backend
 
 jobs:
   deploy:
-    name: Deploy
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,28 +36,11 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/monad-backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./backend/monad-backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Download task definition
+      - name: Update ECS service
         run: |
-          aws ecs describe-task-definition --task-definition monad-backend --query taskDefinition > task-definition.json
-
-      - name: Update container image in task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
-
-      - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
