@@ -10,8 +10,6 @@ on:
 env:
   AWS_REGION: eu-north-1
   ECR_REPOSITORY: monad-backend
-  ECS_SERVICE: monad-backend
-  ECS_CLUSTER: monad-cluster
 
 jobs:
   deploy:
@@ -31,7 +29,6 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push image to Amazon ECR
-        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
@@ -39,8 +36,73 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./backend/monad-backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Update ECS service
-        run: |
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login to ECR
+            aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 055357411429.dkr.ecr.eu-north-1.amazonaws.com
+
+            cd /app
+
+            # Create docker-compose.yml if not exists
+            cat > docker-compose.yml << 'COMPOSE'
+            services:
+              postgres:
+                image: postgres:16-alpine
+                container_name: monad_postgres
+                environment:
+                  POSTGRES_DB: monad
+                  POSTGRES_USER: monad
+                  POSTGRES_PASSWORD: monad_secure_pwd
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                networks:
+                  - monad_network
+                healthcheck:
+                  test: ["CMD", "pg_isready", "-d", "monad", "-U", "monad"]
+                  timeout: 5s
+                  retries: 5
+                  start_period: 60s
+                  interval: 10s
+
+              app:
+                image: 055357411429.dkr.ecr.eu-north-1.amazonaws.com/monad-backend:latest
+                container_name: monad_app
+                ports:
+                  - "80:8000"
+                environment:
+                  APP_ENV: prod
+                  APP_SECRET: ${{ secrets.APP_SECRET }}
+                  DATABASE_URL: "postgresql://monad:monad_secure_pwd@postgres:5432/monad?serverVersion=16&charset=utf8"
+                  JWT_PASSPHRASE: ${{ secrets.JWT_PASSPHRASE }}
+                  CORS_ALLOW_ORIGIN: "*"
+                  AWS_S3_REGION: eu-central-1
+                  AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+                  AWS_S3_ACCESS_KEY_ID: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
+                  AWS_S3_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
+                networks:
+                  - monad_network
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+
+            volumes:
+              postgres_data:
+
+            networks:
+              monad_network:
+                driver: bridge
+            COMPOSE
+
+            # Pull latest and restart
+            docker-compose pull app
+            docker-compose up -d
+
+            # Run migrations after app starts
+            sleep 15
+            docker-compose exec -T app php bin/console doctrine:migrations:migrate --no-interaction || true

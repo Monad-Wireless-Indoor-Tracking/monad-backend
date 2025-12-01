@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\UserRole;
 use App\Enum\UserStatus;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -116,6 +117,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->roles = $roles;
 
         return $this;
+    }
+
+    public function addRole(UserRole $role): static
+    {
+        if (!in_array($role->value, $this->roles, true)) {
+            $this->roles[] = $role->value;
+        }
+
+        return $this;
+    }
+
+    public function removeRole(UserRole $role): static
+    {
+        $this->roles = array_filter(
+            $this->roles,
+            fn($r) => $r !== $role->value
+        );
+
+        return $this;
+    }
+
+    public function hasRole(UserRole $role): bool
+    {
+        return in_array($role->value, $this->getRoles(), true);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole(UserRole::SUPERADMIN);
     }
 
     /**
