@@ -49,7 +49,7 @@ services:
       postgres:
         condition: service_healthy
     working_dir: /var/www/html
-    command: sh -c "composer install --no-interaction && (php bin/console lexik:jwt:generate-keypair --skip-if-exists || true) && symfony server:start --no-tls --port=8000 --allow-http --allow-all-ip"
+    command: sh -c "composer install --no-interaction && (php bin/console lexik:jwt:generate-keypair --skip-if-exists || true) && php -S 0.0.0.0:8000 -t public"
 
 volumes:
   postgres_data:
