@@ -17,16 +17,21 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         /** @var User $superadmin */
         $superadmin = $this->getReference(UserFixtures::SUPERADMIN_REFERENCE, User::class);
 
-        $quest = $this->createFiitTreasureHunt($superadmin);
-        $manager->persist($quest);
+        // Quest 1: MONAD1-MONAD6 (numbered beacons)
+        $quest1 = $this->createFiitTreasureHuntNumbered($superadmin);
+        $manager->persist($quest1);
+
+        // Quest 2: MONAD only (single device name)
+        $quest2 = $this->createFiitTreasureHuntSingleName($superadmin);
+        $manager->persist($quest2);
 
         $manager->flush();
     }
 
-    private function createFiitTreasureHunt(User $createdBy): Quest
+    private function createFiitTreasureHuntNumbered(User $createdBy): Quest
     {
         $quest = new Quest();
-        $quest->setName('FIIT Treasure Hunt');
+        $quest->setName('FIIT Treasure Hunt (Numbered)');
         $quest->setDescription(
             "Welcome to the FIIT Treasure Hunt! Your mission is to explore the Faculty of Informatics " .
             "and Information Technologies building and find all 6 hidden BLE beacons (MONAD1-MONAD6). " .
@@ -59,10 +64,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step1->setOrder(1);
         $step1->setConfig([
             'device_name' => 'MONAD1',
-            'device_id' => 'AA:BB:CC:DD:EE:01',
             'description' => "Your first beacon awaits near the main entrance of the FIIT building. " .
-                "Look for MONAD1 close to the information desk. This is where every student's " .
-                "journey at FIIT begins!"
+                "Look for MONAD1 close to the information desk."
         ]);
         $quest->addStep($step1);
 
@@ -73,10 +76,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step2->setOrder(2);
         $step2->setConfig([
             'device_name' => 'MONAD2',
-            'device_id' => 'AA:BB:CC:DD:EE:02',
             'description' => "Head to the student lounge area on the ground floor. MONAD2 is hidden " .
-                "somewhere in this popular hangout spot where students gather between lectures " .
-                "to relax and collaborate."
+                "somewhere in this popular hangout spot."
         ]);
         $quest->addStep($step2);
 
@@ -87,10 +88,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step3->setOrder(3);
         $step3->setConfig([
             'device_name' => 'MONAD3',
-            'device_id' => 'AA:BB:CC:DD:EE:03',
             'description' => "Make your way to the faculty library. MONAD3 is placed among the " .
-                "knowledge repositories where countless students have studied and prepared " .
-                "for their exams. Keep quiet while searching!"
+                "knowledge repositories."
         ]);
         $quest->addStep($step3);
 
@@ -101,10 +100,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step4->setOrder(4);
         $step4->setConfig([
             'device_name' => 'MONAD4',
-            'device_id' => 'AA:BB:CC:DD:EE:04',
             'description' => "Navigate to the computer laboratory area. MONAD4 is hidden in the " .
-                "heart of practical learning, where students code, debug, and bring their " .
-                "projects to life. Check near the workstations!"
+                "heart of practical learning."
         ]);
         $quest->addStep($step4);
 
@@ -115,10 +112,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step5->setOrder(5);
         $step5->setConfig([
             'device_name' => 'MONAD5',
-            'device_id' => 'AA:BB:CC:DD:EE:05',
             'description' => "Head to the main lecture hall. MONAD5 awaits in the space where " .
-                "knowledge is shared daily. This auditorium has witnessed countless " .
-                "lectures, presentations, and academic discussions."
+                "knowledge is shared daily."
         ]);
         $quest->addStep($step5);
 
@@ -129,10 +124,8 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $step6->setOrder(6);
         $step6->setConfig([
             'device_name' => 'MONAD6',
-            'device_id' => 'AA:BB:CC:DD:EE:06',
             'description' => "Your final beacon is in the cafeteria! MONAD6 is placed in this " .
-                "social hub where students refuel and recharge. Find it to complete your " .
-                "treasure hunt adventure!"
+                "social hub."
         ]);
         $quest->addStep($step6);
 
@@ -143,9 +136,121 @@ class QuestFixtures extends Fixture implements DependentFixtureInterface
         $finishStep->setOrder(7);
         $finishStep->setConfig([
             'description' => "Amazing work, explorer! You've successfully found all 6 MONAD beacons " .
-                "and completed the FIIT Treasure Hunt. You've earned 150 points and discovered " .
-                "key locations throughout the faculty. Thank you for participating in this " .
-                "indoor positioning experiment!"
+                "and completed the FIIT Treasure Hunt. You've earned 150 points!"
+        ]);
+        $quest->addStep($finishStep);
+
+        return $quest;
+    }
+
+    private function createFiitTreasureHuntSingleName(User $createdBy): Quest
+    {
+        $quest = new Quest();
+        $quest->setName('FIIT Treasure Hunt (Single MONAD)');
+        $quest->setDescription(
+            "Welcome to the FIIT Treasure Hunt! Your mission is to find the MONAD beacon 6 times " .
+            "at different locations throughout the Faculty of Informatics and Information Technologies. " .
+            "Use your phone's Bluetooth to detect the beacon at each location!\n\n" .
+            "Good luck, explorer!"
+        );
+        $quest->setAvailableFrom(new \DateTime('2025-01-01 00:00:00'));
+        $quest->setAvailableTo(new \DateTime('2025-12-31 23:59:59'));
+        $quest->setPoints(150.0);
+        $quest->setEstimatedDuration(45);
+        $quest->setCreatedBy($createdBy);
+
+        // Step 0: Start
+        $startStep = new QuestStep();
+        $startStep->setName('Begin Your Adventure');
+        $startStep->setType(QuestStepType::START);
+        $startStep->setOrder(0);
+        $startStep->setConfig([
+            'description' => "Welcome to the FIIT Treasure Hunt! You're about to embark on an exciting " .
+                "journey through the faculty building. Make sure your Bluetooth is enabled and your " .
+                "phone is charged. Tap 'Start' when you're ready to begin!"
+        ]);
+        $quest->addStep($startStep);
+
+        // Step 1: Find MONAD - Location 1
+        $step1 = new QuestStep();
+        $step1->setName('Find MONAD - Main Entrance');
+        $step1->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step1->setOrder(1);
+        $step1->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Your first beacon awaits near the main entrance of the FIIT building. " .
+                "Look for MONAD close to the information desk."
+        ]);
+        $quest->addStep($step1);
+
+        // Step 2: Find MONAD - Location 2
+        $step2 = new QuestStep();
+        $step2->setName('Find MONAD - Student Lounge');
+        $step2->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step2->setOrder(2);
+        $step2->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Head to the student lounge area on the ground floor. MONAD is hidden " .
+                "somewhere in this popular hangout spot."
+        ]);
+        $quest->addStep($step2);
+
+        // Step 3: Find MONAD - Location 3
+        $step3 = new QuestStep();
+        $step3->setName('Find MONAD - Library');
+        $step3->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step3->setOrder(3);
+        $step3->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Make your way to the faculty library. MONAD is placed among the " .
+                "knowledge repositories."
+        ]);
+        $quest->addStep($step3);
+
+        // Step 4: Find MONAD - Location 4
+        $step4 = new QuestStep();
+        $step4->setName('Find MONAD - Computer Labs');
+        $step4->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step4->setOrder(4);
+        $step4->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Navigate to the computer laboratory area. MONAD is hidden in the " .
+                "heart of practical learning."
+        ]);
+        $quest->addStep($step4);
+
+        // Step 5: Find MONAD - Location 5
+        $step5 = new QuestStep();
+        $step5->setName('Find MONAD - Lecture Hall');
+        $step5->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step5->setOrder(5);
+        $step5->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Head to the main lecture hall. MONAD awaits in the space where " .
+                "knowledge is shared daily."
+        ]);
+        $quest->addStep($step5);
+
+        // Step 6: Find MONAD - Location 6
+        $step6 = new QuestStep();
+        $step6->setName('Find MONAD - Cafeteria');
+        $step6->setType(QuestStepType::FIND_BLE_DEVICE);
+        $step6->setOrder(6);
+        $step6->setConfig([
+            'device_name' => 'MONAD',
+            'description' => "Your final beacon is in the cafeteria! MONAD is placed in this " .
+                "social hub."
+        ]);
+        $quest->addStep($step6);
+
+        // Step 7: Finish
+        $finishStep = new QuestStep();
+        $finishStep->setName('Congratulations!');
+        $finishStep->setType(QuestStepType::FINISH);
+        $finishStep->setOrder(7);
+        $finishStep->setConfig([
+            'description' => "Amazing work, explorer! You've successfully found the MONAD beacon 6 times " .
+                "and completed the FIIT Treasure Hunt. You've earned 150 points!"
         ]);
         $quest->addStep($finishStep);
 

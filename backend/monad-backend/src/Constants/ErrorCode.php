@@ -45,6 +45,7 @@ class ErrorCode
     public const STORAGE_INVALID_FILE_TYPE = 'STORAGE_302';
     public const STORAGE_FILENAME_REQUIRED = 'STORAGE_303';
     public const STORAGE_S3_UNAVAILABLE = 'STORAGE_304';
+    public const STORAGE_EXPERIMENT_ID_REQUIRED = 'STORAGE_305';
 
     // System Errors (900-999)
     public const SYSTEM_INTERNAL_ERROR = 'SYSTEM_900';
@@ -84,6 +85,7 @@ class ErrorCode
             self::STORAGE_INVALID_FILE_TYPE => 'File type is not allowed',
             self::STORAGE_FILENAME_REQUIRED => 'Filename is required',
             self::STORAGE_S3_UNAVAILABLE => 'Storage service is temporarily unavailable',
+            self::STORAGE_EXPERIMENT_ID_REQUIRED => 'Experiment ID is required',
 
             self::SYSTEM_INTERNAL_ERROR => 'Internal server error',
             self::SYSTEM_DATABASE_ERROR => 'Database operation failed',

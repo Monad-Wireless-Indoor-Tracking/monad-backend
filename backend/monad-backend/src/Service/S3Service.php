@@ -18,6 +18,7 @@ class S3Service
         'application/json',
         'text/csv',
         'text/plain',
+        'text/tab-separated-values',
     ];
 
     private S3Client $s3Client;
@@ -197,6 +198,72 @@ class S3Service
     }
 
     /**
+     * Generate a pre-signed URL for uploading experiment data directly to S3
+     *
+     * Uses experiment-specific path structure: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
+     *
+     * @param string $filename Original filename
+     * @param string $contentType MIME type of the file
+     * @param int $fileSize Expected file size in bytes
+     * @param string $userId User ID for organizing uploads
+     * @param string $experimentId Experiment ID for organizing uploads
+     * @return array{uploadUrl: string, objectKey: string, expiresAt: string}
+     */
+    public function generateExperimentUploadUrl(
+        string $filename,
+        string $contentType,
+        int $fileSize,
+        string $userId,
+        string $experimentId,
+    ): array {
+        $this->validateUploadRequest($filename, $contentType, $fileSize);
+
+        // Generate date-based path components using current UTC time
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $year = $now->format('Y');
+        $month = $now->format('m');
+        $day = $now->format('d');
+
+        // Generate unique object key: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
+        $objectKey = sprintf(
+            'experiments/%s/%s/%s/%s/%s/%s',
+            $year,
+            $month,
+            $day,
+            $userId,
+            $experimentId,
+            $this->sanitizeFilename($filename)
+        );
+
+        try {
+            $cmd = $this->s3Client->getCommand('PutObject', [
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'ContentType' => $contentType,
+                'ContentLength' => $fileSize,
+            ]);
+
+            $presignedRequest = $this->s3Client->createPresignedRequest(
+                $cmd,
+                $this->presignedUrlExpiry
+            );
+
+            $expiresAt = new \DateTimeImmutable($this->presignedUrlExpiry);
+
+            return [
+                'uploadUrl' => (string) $presignedRequest->getUri(),
+                'objectKey' => $objectKey,
+                'expiresAt' => $expiresAt->format(\DateTimeInterface::ATOM),
+            ];
+        } catch (\Exception $e) {
+            throw new SystemException(
+                ErrorCode::STORAGE_S3_UNAVAILABLE,
+                previous: $e
+            );
+        }
+    }
+
+    /**
      * Validate the upload request parameters
      */
     private function validateUploadRequest(
@@ -260,6 +327,82 @@ class S3Service
             'uploads/%s/%s/%s',
             $userId,
             Uuid::v4()->toRfc4122(),
+            $this->sanitizeFilename($filename)
+        );
+
+        try {
+            // Open php://input as a stream - this reads directly from request body
+            // No temp file is created!
+            $inputStream = fopen('php://input', 'rb');
+
+            $result = $this->s3Client->putObject([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'Body' => $inputStream,
+                'ContentType' => $contentType,
+                'ContentLength' => $contentLength,
+            ]);
+
+            if (is_resource($inputStream)) {
+                fclose($inputStream);
+            }
+
+            return [
+                'success' => true,
+                'objectKey' => $objectKey,
+                'url' => $result['ObjectURL'] ?? sprintf(
+                    'https://%s.s3.%s.amazonaws.com/%s',
+                    $this->bucket,
+                    $this->region,
+                    $objectKey
+                ),
+                'size' => $contentLength,
+                'contentType' => $contentType,
+            ];
+        } catch (AwsException $e) {
+            throw new SystemException(
+                ErrorCode::STORAGE_UPLOAD_FAILED,
+                previous: $e
+            );
+        }
+    }
+
+    /**
+     * Stream upload experiment data directly from php://input to S3 (no temp file)
+     *
+     * Uses experiment-specific path structure: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
+     * Client must send raw binary body (not multipart/form-data)
+     *
+     * @param string $filename Filename from header
+     * @param string $contentType Content-Type from header
+     * @param int $contentLength Content-Length from header
+     * @param string $userId User ID for organizing uploads
+     * @param string $experimentId Experiment/Quest enrollment ID
+     * @return array{success: bool, objectKey: string, url: string, size: int, contentType: string}
+     */
+    public function directExperimentStreamUpload(
+        string $filename,
+        string $contentType,
+        int $contentLength,
+        string $userId,
+        string $experimentId,
+    ): array {
+        $this->validateUploadRequest($filename, $contentType, $contentLength);
+
+        // Generate date-based path components using current UTC time
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $year = $now->format('Y');
+        $month = $now->format('m');
+        $day = $now->format('d');
+
+        // Generate unique object key: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
+        $objectKey = sprintf(
+            'experiments/%s/%s/%s/%s/%s/%s',
+            $year,
+            $month,
+            $day,
+            $userId,
+            $experimentId,
             $this->sanitizeFilename($filename)
         );
 

@@ -4,12 +4,7 @@ namespace App\DataFixtures;
 
 use App\Entity\News;
 use App\Entity\QrCode;
-use App\Entity\Quest;
-use App\Entity\QuestEnrollment;
-use App\Entity\QuestStep;
 use App\Entity\User;
-use App\Enum\QuestEnrollmentStatus;
-use App\Enum\QuestStepType;
 use App\Enum\UserStatus;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -32,14 +27,10 @@ class AppFixtures extends Fixture
         // Create QR codes
         $this->createQrCodes($manager, $users['admin']);
 
-        // Create quests with steps
-        $quests = $this->createQuests($manager, $users['admin']);
-
         // Create news items
         $this->createNews($manager, $users['admin']);
 
-        // Create some quest enrollments
-        $this->createQuestEnrollments($manager, $users, $quests);
+        // Quests are created in QuestFixtures
 
         $manager->flush();
     }
@@ -106,135 +97,6 @@ class AppFixtures extends Fixture
         return $qrCodes;
     }
 
-    private function createQuests(ObjectManager $manager, User $createdBy): array
-    {
-        $quests = [];
-        $now = new \DateTime();
-
-        // 1. Past Quest
-        $pastQuest = new Quest();
-        $pastQuest->setName('Historic Bratislava Tour');
-        $pastQuest->setDescription('Explore the historical landmarks of Bratislava\'s Old Town. Visit iconic locations and learn about the city\'s rich history.');
-        $pastQuest->setAvailableFrom((clone $now)->modify('-5 days'));
-        $pastQuest->setAvailableTo((clone $now)->modify('-1 day'));
-        $pastQuest->setCreatedBy($createdBy);
-        $pastQuest->setPoints(100);
-        $pastQuest->setEstimatedDuration(60);
-
-        $this->addQuestSteps($pastQuest, [
-            ['name' => 'Start Historic Tour', 'type' => QuestStepType::START, 'config' => ['description' => 'Welcome to the Historic Bratislava Tour!']],
-            ['name' => 'Visit Main Square', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-1', 'description' => 'Find and scan the QR code at Main Square']],
-            ['name' => 'Walk to Cathedral', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1516, 'longitude' => 17.1093, 'radius' => 50]],
-            ['name' => 'Scan Cathedral QR', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-3', 'description' => 'Scan the QR code at St. Martin\'s Cathedral']],
-            ['name' => 'Complete Tour', 'type' => QuestStepType::FINISH, 'config' => ['message' => 'Congratulations on completing the Historic Bratislava Tour!']],
-        ]);
-
-        $manager->persist($pastQuest);
-        $quests['past'] = $pastQuest;
-
-        // 2. Active Quest 1 - Castle Adventure
-        $activeQuest1 = new Quest();
-        $activeQuest1->setName('Castle Adventure');
-        $activeQuest1->setDescription('Discover the secrets of Bratislava Castle and its surroundings. A perfect blend of history and modern technology.');
-        $activeQuest1->setAvailableFrom((clone $now)->modify('-2 days'));
-        $activeQuest1->setAvailableTo((clone $now)->modify('+7 days'));
-        $activeQuest1->setCreatedBy($createdBy);
-        $activeQuest1->setPoints(150);
-        $activeQuest1->setEstimatedDuration(90);
-
-        $this->addQuestSteps($activeQuest1, [
-            ['name' => 'Begin Castle Adventure', 'type' => QuestStepType::START, 'config' => ['description' => 'Start your journey to explore Bratislava Castle!']],
-            ['name' => 'Scan Castle Entrance', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-2', 'description' => 'Find the QR code at the castle entrance']],
-            ['name' => 'Connect to Castle WiFi', 'type' => QuestStepType::CONNECT_TO_AP, 'config' => ['ssid' => 'Castle_Guest_WiFi', 'description' => 'Connect to the castle guest WiFi network']],
-            ['name' => 'Visit Presidential Palace', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1452, 'longitude' => 17.1062, 'radius' => 30]],
-            ['name' => 'Find Palace Beacon', 'type' => QuestStepType::FIND_BLE_DEVICE, 'config' => ['device_name' => 'Palace_Beacon', 'description' => 'Find the Bluetooth beacon near the palace']],
-            ['name' => 'Adventure Complete', 'type' => QuestStepType::FINISH, 'config' => ['message' => 'Great job exploring the castle area!']],
-        ]);
-
-        $manager->persist($activeQuest1);
-        $quests['active1'] = $activeQuest1;
-
-        // 3. Active Quest 2 - Riverbank Discovery
-        $activeQuest2 = new Quest();
-        $activeQuest2->setName('Riverbank Discovery');
-        $activeQuest2->setDescription('Follow the Danube river and discover amazing spots along Bratislava\'s waterfront. Enjoy scenic views and hidden gems.');
-        $activeQuest2->setAvailableFrom((clone $now)->modify('-2 days'));
-        $activeQuest2->setAvailableTo((clone $now)->modify('+7 days'));
-        $activeQuest2->setCreatedBy($createdBy);
-        $activeQuest2->setPoints(120);
-        $activeQuest2->setEstimatedDuration(75);
-
-        $this->addQuestSteps($activeQuest2, [
-            ['name' => 'Start Riverbank Tour', 'type' => QuestStepType::START, 'config' => ['description' => 'Begin your journey along the beautiful Danube!']],
-            ['name' => 'Scan Riverbank Point', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-7', 'description' => 'Scan the QR code at the riverbank']],
-            ['name' => 'Walk to UFO Tower', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1511, 'longitude' => 17.1110, 'radius' => 40]],
-            ['name' => 'Scan UFO Tower', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-8', 'description' => 'Find and scan the QR at UFO Tower']],
-            ['name' => 'Finish Riverbank Tour', 'type' => QuestStepType::FINISH, 'config' => ['message' => 'You\'ve completed the Riverbank Discovery!']],
-        ]);
-
-        $manager->persist($activeQuest2);
-        $quests['active2'] = $activeQuest2;
-
-        // 4. Active Quest 3 - Cultural Journey
-        $activeQuest3 = new Quest();
-        $activeQuest3->setName('Cultural Journey');
-        $activeQuest3->setDescription('Immerse yourself in Bratislava\'s vibrant cultural scene. Visit theaters, squares, and cultural landmarks.');
-        $activeQuest3->setAvailableFrom((clone $now)->modify('-2 days'));
-        $activeQuest3->setAvailableTo((clone $now)->modify('+7 days'));
-        $activeQuest3->setCreatedBy($createdBy);
-        $activeQuest3->setPoints(130);
-        $activeQuest3->setEstimatedDuration(80);
-
-        $this->addQuestSteps($activeQuest3, [
-            ['name' => 'Begin Cultural Journey', 'type' => QuestStepType::START, 'config' => ['description' => 'Start exploring Bratislava\'s cultural treasures!']],
-            ['name' => 'Visit Michalska Tower', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1500, 'longitude' => 17.1089, 'radius' => 25]],
-            ['name' => 'Scan Tower QR', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-5', 'description' => 'Scan the QR code at Michalska Tower']],
-            ['name' => 'Wait for Theater Opening', 'type' => QuestStepType::WAIT, 'config' => ['duration' => 300, 'description' => 'Wait 5 minutes at the theater']],
-            ['name' => 'Scan Theater QR', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-6', 'description' => 'Scan at Slovak National Theatre']],
-            ['name' => 'Complete Cultural Journey', 'type' => QuestStepType::FINISH, 'config' => ['message' => 'Well done completing the Cultural Journey!']],
-        ]);
-
-        $manager->persist($activeQuest3);
-        $quests['active3'] = $activeQuest3;
-
-        // 5. Future Quest
-        $futureQuest = new Quest();
-        $futureQuest->setName('Summer Festival Trail');
-        $futureQuest->setDescription('Get ready for the upcoming summer festival! This quest will take you through all the festival venues and preparation sites.');
-        $futureQuest->setAvailableFrom((clone $now)->modify('+5 days'));
-        $futureQuest->setAvailableTo((clone $now)->modify('+12 days'));
-        $futureQuest->setCreatedBy($createdBy);
-        $futureQuest->setPoints(200);
-        $futureQuest->setEstimatedDuration(120);
-
-        $this->addQuestSteps($futureQuest, [
-            ['name' => 'Start Festival Trail', 'type' => QuestStepType::START, 'config' => ['description' => 'Welcome to the Summer Festival Trail!']],
-            ['name' => 'Visit Hviezdoslav Square', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1490, 'longitude' => 17.1070, 'radius' => 35]],
-            ['name' => 'Scan Square QR', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-9', 'description' => 'Find the festival preparation QR']],
-            ['name' => 'Connect to Festival Network', 'type' => QuestStepType::CONNECT_TO_AP, 'config' => ['ssid' => 'Festival_Setup', 'description' => 'Connect to the festival setup network']],
-            ['name' => 'Walk to Park Bridge', 'type' => QuestStepType::WALK_TO, 'config' => ['latitude' => 48.1530, 'longitude' => 17.1150, 'radius' => 45]],
-            ['name' => 'Scan Final Location', 'type' => QuestStepType::SCAN_QR, 'config' => ['qr_code' => 'QRM-10', 'description' => 'Scan the QR at Park Bridge']],
-            ['name' => 'Festival Trail Complete', 'type' => QuestStepType::FINISH, 'config' => ['message' => 'Excellent! You\'re ready for the summer festival!']],
-        ]);
-
-        $manager->persist($futureQuest);
-        $quests['future'] = $futureQuest;
-
-        return $quests;
-    }
-
-    private function addQuestSteps(Quest $quest, array $stepsData): void
-    {
-        foreach ($stepsData as $index => $stepData) {
-            $step = new QuestStep();
-            $step->setName($stepData['name']);
-            $step->setType($stepData['type']);
-            $step->setOrder($index);
-            $step->setConfig($stepData['config']);
-            $quest->addStep($step);
-        }
-    }
-
     private function createNews(ObjectManager $manager, User $createdBy): void
     {
         $newsItems = [
@@ -267,45 +129,5 @@ class AppFixtures extends Fixture
             $news->setCreatedBy($createdBy);
             $manager->persist($news);
         }
-    }
-
-    private function createQuestEnrollments(ObjectManager $manager, array $users, array $quests): void
-    {
-        // User 1 enrolled in past quest (completed)
-        $enrollment1 = new QuestEnrollment();
-        $enrollment1->setUser($users['user1']);
-        $enrollment1->setQuest($quests['past']);
-        $enrollment1->setStatus(QuestEnrollmentStatus::COMPLETED);
-        $enrollment1->setCompletedAt((new \DateTime())->modify('-2 days'));
-        $manager->persist($enrollment1);
-
-        // User 2 enrolled in active quest 1 (in progress)
-        $enrollment2 = new QuestEnrollment();
-        $enrollment2->setUser($users['user2']);
-        $enrollment2->setQuest($quests['active1']);
-        $enrollment2->setStatus(QuestEnrollmentStatus::IN_PROGRESS);
-        $manager->persist($enrollment2);
-
-        // User 3 enrolled in active quest 2 (in progress)
-        $enrollment3 = new QuestEnrollment();
-        $enrollment3->setUser($users['user3']);
-        $enrollment3->setQuest($quests['active2']);
-        $enrollment3->setStatus(QuestEnrollmentStatus::IN_PROGRESS);
-        $manager->persist($enrollment3);
-
-        // User 4 enrolled in active quest 3 (in progress)
-        $enrollment4 = new QuestEnrollment();
-        $enrollment4->setUser($users['user4']);
-        $enrollment4->setQuest($quests['active3']);
-        $enrollment4->setStatus(QuestEnrollmentStatus::IN_PROGRESS);
-        $manager->persist($enrollment4);
-
-        // User 5 enrolled in active quest 1 (completed)
-        $enrollment5 = new QuestEnrollment();
-        $enrollment5->setUser($users['user5']);
-        $enrollment5->setQuest($quests['active1']);
-        $enrollment5->setStatus(QuestEnrollmentStatus::COMPLETED);
-        $enrollment5->setCompletedAt((new \DateTime())->modify('-1 day'));
-        $manager->persist($enrollment5);
     }
 }

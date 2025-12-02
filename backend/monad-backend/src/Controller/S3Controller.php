@@ -312,6 +312,125 @@ class S3Controller extends AbstractController
         return $this->json($result, Response::HTTP_OK);
     }
 
+    #[Route('/api/storage/experiment-upload', name: 'api_storage_experiment_upload', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/storage/experiment-upload',
+        summary: 'Upload experiment data file to S3 (direct stream)',
+        description: 'Uploads experiment data directly to S3 by streaming from request body. NO temp file is created on the backend. Send raw binary body with required headers. Files are stored in experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}',
+        security: [['Bearer' => []]],
+        tags: ['Storage']
+    )]
+    #[OA\Header(
+        header: 'X-Filename',
+        description: 'Original filename',
+        required: true,
+        schema: new OA\Schema(type: 'string', example: 'ble_data.tsv')
+    )]
+    #[OA\Header(
+        header: 'X-Experiment-Id',
+        description: 'Experiment/Quest enrollment ID',
+        required: true,
+        schema: new OA\Schema(type: 'string', example: '550e8400-e29b-41d4-a716-446655440000')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Raw binary file content (NOT multipart/form-data)',
+        content: new OA\MediaType(
+            mediaType: 'text/tab-separated-values',
+            schema: new OA\Schema(type: 'string', format: 'binary')
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'File uploaded successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'objectKey',
+                    type: 'string',
+                    example: 'experiments/2024/01/15/550e8400-e29b-41d4-a716-446655440000/a1b2c3d4/ble_data.tsv',
+                    description: 'S3 object key where the file was stored'
+                ),
+                new OA\Property(
+                    property: 'url',
+                    type: 'string',
+                    example: 'https://bucket.s3.region.amazonaws.com/experiments/...',
+                    description: 'URL of the uploaded file'
+                ),
+                new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),
+                new OA\Property(property: 'contentType', type: 'string', example: 'text/tab-separated-values', description: 'MIME type')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Bad request - validation errors',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'code', type: 'string', example: 'STORAGE_301'),
+                new OA\Property(property: 'message', type: 'string', example: 'File size exceeds maximum allowed (50 MB)')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Unauthorized - missing or invalid token',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'code', type: 'string', example: 'AUTH_006'),
+                new OA\Property(property: 'message', type: 'string', example: 'Authentication required')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 500,
+        description: 'Upload failed',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'code', type: 'string', example: 'STORAGE_300'),
+                new OA\Property(property: 'message', type: 'string', example: 'File upload failed')
+            ]
+        )
+    )]
+    public function experimentUpload(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
+        }
+
+        // Get metadata from headers
+        $filename = $request->headers->get('X-Filename');
+        $experimentId = $request->headers->get('X-Experiment-Id');
+        $contentType = $request->headers->get('Content-Type', 'text/tab-separated-values');
+        $contentLength = (int) $request->headers->get('Content-Length', 0);
+
+        if (!$filename) {
+            throw new ValidationException(ErrorCode::STORAGE_FILENAME_REQUIRED);
+        }
+
+        if (!$experimentId) {
+            throw new ValidationException(ErrorCode::STORAGE_EXPERIMENT_ID_REQUIRED);
+        }
+
+        if ($contentLength <= 0) {
+            throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
+        }
+
+        // Direct stream from php://input to S3 - no temp file!
+        $result = $this->s3Service->directExperimentStreamUpload(
+            filename: $filename,
+            contentType: $contentType,
+            contentLength: $contentLength,
+            userId: $user->getId()->toRfc4122(),
+            experimentId: $experimentId,
+        );
+
+        return $this->json($result, Response::HTTP_OK);
+    }
+
     #[Route('/api/storage/test', name: 'api_storage_test', methods: ['GET'])]
     #[OA\Get(
         path: '/api/storage/test',
