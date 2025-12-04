@@ -31,15 +31,24 @@ services:
       retries: 3
       start_period: 40s
     environment:
+      # Symfony core
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
+      DEFAULT_URI: ${DEFAULT_URI:-http://localhost}
+      # Database
       DATABASE_URL: "postgresql://${POSTGRES_USER:-monad}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-monad}?serverVersion=16&charset=utf8"
+      # JWT
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # CORS
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-*}
+      # AWS S3
       AWS_S3_REGION: ${AWS_S3_REGION:-eu-central-1}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
       AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
+      AWS_S3_PRESIGNED_URL_EXPIRY: ${AWS_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
     networks:
       - monad_network
     depends_on:
