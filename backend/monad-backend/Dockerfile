@@ -30,6 +30,9 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . .
 
+# Create minimal .env for Symfony (actual values come from docker-compose environment)
+RUN echo "APP_ENV=prod" > .env
+
 # Install dependencies (production mode, skip scripts that need DB)
 ENV APP_ENV=prod
 RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts && \
