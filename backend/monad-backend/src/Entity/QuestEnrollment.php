@@ -12,8 +12,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: QuestEnrollmentRepository::class)]
 #[ORM\Table(name: 'quest_enrollments')]
-#[ORM\UniqueConstraint(name: 'user_quest_enrollment_idx', columns: ['user_id', 'quest_id'])]
 #[ORM\Index(name: 'enrollment_status_idx', columns: ['status'])]
+#[ORM\Index(name: 'user_quest_idx', columns: ['user_id', 'quest_id'])]
 #[ORM\HasLifecycleCallbacks]
 class QuestEnrollment
 {

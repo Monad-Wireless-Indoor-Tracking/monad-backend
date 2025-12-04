@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monad_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-monad}
+      POSTGRES_USER: ${POSTGRES_USER:-monad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monad_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-monad}", "-U", "${POSTGRES_USER:-monad}"]
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      interval: 10s
+
+  app:
+    image: 055357411429.dkr.ecr.eu-north-1.amazonaws.com/monad-backend:latest
+    container_name: monad_app
+    ports:
+      - "80:8000"
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-monad}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-monad}?serverVersion=16&charset=utf8"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-*}
+      AWS_S3_REGION: ${AWS_S3_REGION:-eu-central-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
+      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
+    networks:
+      - monad_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+
+networks:
+  monad_network:
+    driver: bridge

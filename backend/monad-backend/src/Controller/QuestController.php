@@ -18,7 +18,6 @@ use App\Entity\QuestStepSkipRecord;
 use App\Entity\User;
 use App\Enum\QuestEnrollmentStatus;
 use App\Enum\QuestStepCompletionStatus;
-use App\Repository\QuestEnrollmentRepository;
 use App\Repository\QuestRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -287,19 +286,9 @@ class QuestController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(
-        response: 409,
-        description: 'Conflict - user already enrolled in this quest',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'error', type: 'string', example: 'You are already enrolled in this quest')
-            ]
-        )
-    )]
     public function startQuest(
         string $id,
         QuestRepository $questRepository,
-        QuestEnrollmentRepository $enrollmentRepository,
         EntityManagerInterface $entityManager
     ): JsonResponse {
         // Check authentication
@@ -344,35 +333,24 @@ class QuestController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // Check if user is already enrolled
-        $existingEnrollment = $enrollmentRepository->findOneBy([
-            'user' => $user,
-            'quest' => $quest
-        ]);
-
-        if ($existingEnrollment) {
-            return $this->json([
-                'error' => 'You are already enrolled in this quest'
-            ], Response::HTTP_CONFLICT);
-        }
-
-        // Create data path: s3://monad-bucket/experiments/YYYY/MM/DD/:user_id/:quest_id/
-        $date = new \DateTime();
-        $dataPath = sprintf(
-            's3://monad-bucket/experiments/%s/%s/%s/%s/%s/',
-            $date->format('Y'),
-            $date->format('m'),
-            $date->format('d'),
-            (string) $user->getId(),
-            (string) $quest->getId()
-        );
-
         // Create quest enrollment
         $enrollment = new QuestEnrollment();
         $enrollment->setUser($user);
         $enrollment->setQuest($quest);
-        $enrollment->setDataPath($dataPath);
         $enrollment->setCompletedAt(null);
+
+        // Create data path: s3://monad-bucket/experiments/YYYY/MM/DD/:user_id/:quest_id/:enrollment_id/
+        $date = new \DateTime();
+        $dataPath = sprintf(
+            's3://monad-bucket/experiments/%s/%s/%s/%s/%s/%s/',
+            $date->format('Y'),
+            $date->format('m'),
+            $date->format('d'),
+            (string) $user->getId(),
+            (string) $quest->getId(),
+            (string) $enrollment->getId()
+        );
+        $enrollment->setDataPath($dataPath);
 
         // Create quest step completions for all steps
         $steps = $quest->getSteps();
