@@ -677,20 +677,168 @@ readonly class QuestDecorator implements OpenApiFactoryInterface
         );
         $paths->addPath('/api/quest/{quest_id}/complete', $questCompletePath);
 
-        // Ensure Quest tag exists
+        // Add /api/admin/quests POST - Create a new quest (requires ROLE_SUPERADMIN)
+        $adminQuestCreatePath = new PathItem(
+            post: new Operation(
+                tags: ['Admin - Quests'],
+                summary: 'Create a new quest',
+                description: 'Creates a new quest with steps. Requires ROLE_SUPERADMIN.',
+                requestBody: new RequestBody(
+                    description: 'Quest data with steps',
+                    required: true,
+                    content: new \ArrayObject([
+                        'application/json' => new MediaType(
+                            schema: new \ArrayObject([
+                                'type' => 'object',
+                                'required' => ['name', 'description', 'available_from', 'points', 'steps'],
+                                'properties' => [
+                                    'name' => [
+                                        'type' => 'string',
+                                        'maxLength' => 255,
+                                        'example' => 'FIIT Treasure Hunt',
+                                        'description' => 'Quest name',
+                                    ],
+                                    'description' => [
+                                        'type' => 'string',
+                                        'example' => 'Find all 6 MONAD beacons hidden in the FIIT building',
+                                        'description' => 'Quest description',
+                                    ],
+                                    'available_from' => [
+                                        'type' => 'string',
+                                        'format' => 'date-time',
+                                        'example' => '2025-01-01T00:00:00Z',
+                                        'description' => 'When the quest becomes available',
+                                    ],
+                                    'available_to' => [
+                                        'type' => 'string',
+                                        'format' => 'date-time',
+                                        'nullable' => true,
+                                        'example' => '2025-12-31T23:59:59Z',
+                                        'description' => 'When the quest expires (optional)',
+                                    ],
+                                    'points' => [
+                                        'type' => 'number',
+                                        'minimum' => 0,
+                                        'example' => 150.0,
+                                        'description' => 'Points awarded for completion',
+                                    ],
+                                    'estimated_duration' => [
+                                        'type' => 'integer',
+                                        'nullable' => true,
+                                        'example' => 45,
+                                        'description' => 'Estimated duration in minutes',
+                                    ],
+                                    'steps' => [
+                                        'type' => 'array',
+                                        'description' => 'Quest steps',
+                                        'items' => [
+                                            'type' => 'object',
+                                            'required' => ['name', 'type', 'order', 'config'],
+                                            'properties' => [
+                                                'name' => [
+                                                    'type' => 'string',
+                                                    'example' => 'Find MONAD1',
+                                                    'description' => 'Step name',
+                                                ],
+                                                'type' => [
+                                                    'type' => 'string',
+                                                    'enum' => ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish'],
+                                                    'example' => 'find_ble_device',
+                                                    'description' => 'Step type',
+                                                ],
+                                                'order' => [
+                                                    'type' => 'integer',
+                                                    'minimum' => 0,
+                                                    'example' => 1,
+                                                    'description' => 'Step order in sequence',
+                                                ],
+                                                'config' => [
+                                                    'type' => 'object',
+                                                    'example' => ['device_name' => 'MONAD1', 'description' => 'Find the beacon near the entrance'],
+                                                    'description' => 'Step-specific configuration',
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ])
+                        ),
+                    ])
+                ),
+                responses: [
+                    '201' => new Response(
+                        description: 'Quest created successfully',
+                        content: new \ArrayObject([
+                            'application/json' => new MediaType(
+                                schema: new \ArrayObject([
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'message' => [
+                                            'type' => 'string',
+                                            'example' => 'Quest created successfully',
+                                        ],
+                                        'quest' => [
+                                            'type' => 'object',
+                                            'properties' => [
+                                                'id' => ['type' => 'string', 'format' => 'uuid'],
+                                                'name' => ['type' => 'string'],
+                                                'description' => ['type' => 'string'],
+                                                'points' => ['type' => 'number'],
+                                                'estimatedDuration' => ['type' => 'integer', 'nullable' => true],
+                                                'createdAt' => ['type' => 'string'],
+                                                'steps' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                            ],
+                                        ],
+                                    ],
+                                ])
+                            ),
+                        ])
+                    ),
+                    '400' => new Response(
+                        description: 'Validation error',
+                        content: new \ArrayObject([
+                            'application/json' => new MediaType(
+                                schema: new \ArrayObject([
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'error' => ['type' => 'string', 'example' => 'Validation failed'],
+                                        'details' => ['type' => 'object', 'nullable' => true],
+                                    ],
+                                ])
+                            ),
+                        ])
+                    ),
+                    '401' => new Response(description: 'Unauthorized - not authenticated'),
+                    '403' => new Response(description: 'Forbidden - requires ROLE_SUPERADMIN'),
+                ],
+                security: [['Bearer' => []]]
+            )
+        );
+        $paths->addPath('/api/admin/quests', $adminQuestCreatePath);
+
+        // Ensure Quest and Admin tags exist
         $rootTags = $openApi->getTags();
         $hasQuestTag = false;
+        $hasAdminTag = false;
 
         foreach ($rootTags as $tag) {
             if ($tag->getName() === 'Quest') {
                 $hasQuestTag = true;
-                break;
+            }
+            if ($tag->getName() === 'Admin - Quests') {
+                $hasAdminTag = true;
             }
         }
 
+        $newTags = $rootTags;
         if (!$hasQuestTag) {
-            $newTags = $rootTags;
             $newTags[] = new Tag('Quest', 'Quest management and enrollment endpoints');
+        }
+        if (!$hasAdminTag) {
+            $newTags[] = new Tag('Admin - Quests', 'Admin endpoints for quest management (requires ROLE_SUPERADMIN)');
+        }
+
+        if (!$hasQuestTag || !$hasAdminTag) {
             $openApi = $openApi->withTags($newTags);
         }
 

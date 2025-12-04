@@ -12,6 +12,199 @@
         }
     ],
     "paths": {
+        "/api/admin/quests": {
+            "post": {
+                "tags": [
+                    "Admin - Quests"
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Quest created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quest created successfully"
+                                        },
+                                        "quest": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                },
+                                                "points": {
+                                                    "type": "number"
+                                                },
+                                                "estimatedDuration": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                },
+                                                "createdAt": {
+                                                    "type": "string"
+                                                },
+                                                "steps": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - not authenticated"
+                    },
+                    "403": {
+                        "description": "Forbidden - requires ROLE_SUPERADMIN"
+                    }
+                },
+                "summary": "Create a new quest",
+                "description": "Creates a new quest with steps. Requires ROLE_SUPERADMIN.",
+                "requestBody": {
+                    "description": "Quest data with steps",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "description",
+                                    "available_from",
+                                    "points",
+                                    "steps"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "FIIT Treasure Hunt",
+                                        "description": "Quest name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Find all 6 MONAD beacons hidden in the FIIT building",
+                                        "description": "Quest description"
+                                    },
+                                    "available_from": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2025-01-01T00:00:00Z",
+                                        "description": "When the quest becomes available"
+                                    },
+                                    "available_to": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true,
+                                        "example": "2025-12-31T23:59:59Z",
+                                        "description": "When the quest expires (optional)"
+                                    },
+                                    "points": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "example": 150,
+                                        "description": "Points awarded for completion"
+                                    },
+                                    "estimated_duration": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "example": 45,
+                                        "description": "Estimated duration in minutes"
+                                    },
+                                    "steps": {
+                                        "type": "array",
+                                        "description": "Quest steps",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "type",
+                                                "order",
+                                                "config"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "Find MONAD1",
+                                                    "description": "Step name"
+                                                },
+                                                "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "start",
+                                                        "wait",
+                                                        "scan_qr",
+                                                        "connect_to_ap",
+                                                        "walk_to",
+                                                        "find_ble_device",
+                                                        "finish"
+                                                    ],
+                                                    "example": "find_ble_device",
+                                                    "description": "Step type"
+                                                },
+                                                "order": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "example": 1,
+                                                    "description": "Step order in sequence"
+                                                },
+                                                "config": {
+                                                    "type": "object",
+                                                    "example": {
+                                                        "device_name": "MONAD1",
+                                                        "description": "Find the beacon near the entrance"
+                                                    },
+                                                    "description": "Step-specific configuration"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
         "/api/auth/login": {
             "post": {
                 "tags": [
@@ -1521,6 +1714,10 @@
         {
             "name": "Quest",
             "description": "Quest management and enrollment endpoints"
+        },
+        {
+            "name": "Admin - Quests",
+            "description": "Admin endpoints for quest management (requires ROLE_SUPERADMIN)"
         },
         {
             "name": "Storage",
