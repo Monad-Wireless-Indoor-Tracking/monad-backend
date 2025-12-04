@@ -73,9 +73,8 @@ class ValidStepConfigValidator extends ConstraintValidator
 
         // Required fields
         $this->requireString($config, 'device_name', $type, $constraint);
-        $this->requireString($config, 'device_id', $type, $constraint);
 
-        // Validate MAC address format for device_id
+        // Optional: Validate MAC address format for device_id if provided
         if (isset($config['device_id']) && is_string($config['device_id'])) {
             if (!preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $config['device_id'])) {
                 $this->context->buildViolation($constraint->messageInvalidMacAddress)
