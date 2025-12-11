@@ -55,6 +55,9 @@ class Quest
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    #[ORM\Column(length: 512, nullable: true)]
+    private ?string $featuredImage = null;
+
     #[ORM\OneToMany(targetEntity: QuestStep::class, mappedBy: 'quest', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['order' => 'ASC'])]
     private Collection $steps;
@@ -182,6 +185,18 @@ class Quest
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getFeaturedImage(): ?string
+    {
+        return $this->featuredImage;
+    }
+
+    public function setFeaturedImage(?string $featuredImage): static
+    {
+        $this->featuredImage = $featuredImage;
 
         return $this;
     }

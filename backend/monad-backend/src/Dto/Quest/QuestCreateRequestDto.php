@@ -27,6 +27,9 @@ class QuestCreateRequestDto
     #[Assert\Positive(message: 'Estimated duration must be a positive number')]
     public ?int $estimated_duration = null;
 
+    #[Assert\Length(max: 512, maxMessage: 'Featured image URL cannot be longer than {{ limit }} characters')]
+    public ?string $featured_image = null;
+
     #[Assert\NotNull(message: 'Steps array is required')]
     #[Assert\Type(type: 'array', message: 'Steps must be an array')]
     #[Assert\Count(min: 1, minMessage: 'At least one step is required')]

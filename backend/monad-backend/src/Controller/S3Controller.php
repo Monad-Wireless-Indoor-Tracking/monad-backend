@@ -50,7 +50,7 @@ class S3Controller extends AbstractController
                     property: 'fileSize',
                     type: 'integer',
                     example: 1048576,
-                    description: 'File size in bytes (max 10 MB = 10485760 bytes)'
+                    description: 'File size in bytes (max 50 MB)'
                 )
             ]
         )
@@ -88,7 +88,7 @@ class S3Controller extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'code', type: 'string', example: 'STORAGE_301', description: 'Error code'),
-                new OA\Property(property: 'message', type: 'string', example: 'File size exceeds maximum allowed (10 MB)', description: 'Human-readable error message')
+                new OA\Property(property: 'message', type: 'string', example: 'File size exceeds maximum allowed (50 MB)', description: 'Human-readable error message')
             ]
         )
     )]
@@ -161,13 +161,13 @@ class S3Controller extends AbstractController
                 new OA\Property(
                     property: 'maxFileSize',
                     type: 'integer',
-                    example: 10485760,
+                    example: 52428800,
                     description: 'Maximum file size in bytes'
                 ),
                 new OA\Property(
                     property: 'maxFileSizeMB',
                     type: 'integer',
-                    example: 10,
+                    example: 50,
                     description: 'Maximum file size in megabytes'
                 ),
                 new OA\Property(

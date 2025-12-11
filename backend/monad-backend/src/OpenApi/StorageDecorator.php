@@ -86,12 +86,12 @@ readonly class StorageDecorator implements OpenApiFactoryInterface
                                     'properties' => [
                                         'maxFileSize' => [
                                             'type' => 'integer',
-                                            'example' => 10485760,
+                                            'example' => 52428800,
                                             'description' => 'Maximum file size in bytes',
                                         ],
                                         'maxFileSizeMB' => [
                                             'type' => 'integer',
-                                            'example' => 10,
+                                            'example' => 50,
                                             'description' => 'Maximum file size in megabytes',
                                         ],
                                         'allowedContentTypes' => [
@@ -189,7 +189,7 @@ readonly class StorageDecorator implements OpenApiFactoryInterface
                                         ],
                                         'message' => [
                                             'type' => 'string',
-                                            'example' => 'File size exceeds maximum allowed (10 MB)',
+                                            'example' => 'File size exceeds maximum allowed (50 MB)',
                                         ],
                                     ],
                                 ])
@@ -251,7 +251,7 @@ readonly class StorageDecorator implements OpenApiFactoryInterface
                                     'fileSize' => [
                                         'type' => 'integer',
                                         'example' => 1048576,
-                                        'description' => 'File size in bytes (max 10 MB)',
+                                        'description' => 'File size in bytes (max 50 MB)',
                                     ],
                                 ],
                             ])
@@ -300,7 +300,7 @@ readonly class StorageDecorator implements OpenApiFactoryInterface
                                         ],
                                         'message' => [
                                             'type' => 'string',
-                                            'example' => 'File size exceeds maximum allowed (10 MB)',
+                                            'example' => 'File size exceeds maximum allowed (50 MB)',
                                         ],
                                     ],
                                 ])

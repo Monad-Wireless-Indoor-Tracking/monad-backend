@@ -15,6 +15,7 @@ class QuestDetailResponseDto
         public readonly string $description,
         public readonly float $points,
         public readonly ?int $estimatedDuration,
+        public readonly ?string $featuredImage,
         public readonly string $createdAt,
         public readonly array $steps
     ) {
@@ -33,6 +34,7 @@ class QuestDetailResponseDto
             description: $quest->getDescription(),
             points: $quest->getPoints(),
             estimatedDuration: $quest->getEstimatedDuration(),
+            featuredImage: $quest->getFeaturedImage(),
             createdAt: $quest->getCreatedAt()->format('Y-m-d H:i:s'),
             steps: $steps
         );
@@ -46,6 +48,7 @@ class QuestDetailResponseDto
             'description' => $this->description,
             'points' => $this->points,
             'estimatedDuration' => $this->estimatedDuration,
+            'featuredImage' => $this->featuredImage,
             'createdAt' => $this->createdAt,
             'steps' => array_map(fn(QuestStepDto $step) => $step->toArray(), $this->steps)
         ];

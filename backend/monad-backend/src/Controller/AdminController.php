@@ -76,6 +76,13 @@ class AdminController extends AbstractController
                     description: 'Estimated duration in minutes'
                 ),
                 new OA\Property(
+                    property: 'featured_image',
+                    type: 'string',
+                    nullable: true,
+                    example: 'https://bucket.s3.amazonaws.com/public/quest-image.jpg',
+                    description: 'Featured image URL (max 512 characters)'
+                ),
+                new OA\Property(
                     property: 'steps',
                     type: 'array',
                     items: new OA\Items(
@@ -116,6 +123,7 @@ class AdminController extends AbstractController
                         new OA\Property(property: 'description', type: 'string'),
                         new OA\Property(property: 'points', type: 'number'),
                         new OA\Property(property: 'estimatedDuration', type: 'integer', nullable: true),
+                        new OA\Property(property: 'featuredImage', type: 'string', nullable: true),
                         new OA\Property(property: 'createdAt', type: 'string'),
                         new OA\Property(property: 'steps', type: 'array', items: new OA\Items(type: 'object'))
                     ]
@@ -179,6 +187,7 @@ class AdminController extends AbstractController
         $requestDto->available_to = $data['available_to'] ?? null;
         $requestDto->points = isset($data['points']) ? (float)$data['points'] : 0.0;
         $requestDto->estimated_duration = $data['estimated_duration'] ?? null;
+        $requestDto->featured_image = $data['featured_image'] ?? null;
         $requestDto->steps = [];
 
         // Map steps
@@ -221,6 +230,7 @@ class AdminController extends AbstractController
 
             $quest->setPoints($requestDto->points);
             $quest->setEstimatedDuration($requestDto->estimated_duration);
+            $quest->setFeaturedImage($requestDto->featured_image);
             $quest->setCreatedBy($user);
 
             $entityManager->persist($quest);
