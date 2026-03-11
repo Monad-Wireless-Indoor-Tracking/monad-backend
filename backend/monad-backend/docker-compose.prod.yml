@@ -23,7 +23,7 @@ services:
     container_name: monad_app
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "80:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
