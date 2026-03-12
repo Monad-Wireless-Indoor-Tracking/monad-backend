@@ -49,6 +49,8 @@ services:
       AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
       AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
       AWS_S3_PRESIGNED_URL_EXPIRY: ${AWS_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
+    volumes:
+      - jwt_keys:/var/www/html/config/jwt
     networks:
       - monad_network
     depends_on:
@@ -57,6 +59,7 @@ services:
 
 volumes:
   postgres_data:
+  jwt_keys:
 
 networks:
   monad_network:
