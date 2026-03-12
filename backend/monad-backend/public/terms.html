@@ -36,8 +36,23 @@
   <li><strong>Bluetooth:</strong> Required for scanning and collecting BLE advertisement data from nearby devices</li>
   <li><strong>Location:</strong> Required on Android devices to enable BLE scanning, and may be used for location-based quest features</li>
   <li><strong>Camera:</strong> Required for scanning QR codes during quests</li>
+  <li><strong>Wi-Fi:</strong> Used to detect Wi-Fi network information for connectivity-related quest features</li>
+  <li><strong>Push Notifications:</strong> Used to deliver important updates and quest-related notifications via Firebase Cloud Messaging</li>
 </ul>
 <p>You may deny these permissions, but certain features of the Application will not function without them.</p>
+
+<strong>Crash Reporting</strong>
+<p>The Application uses Firebase Crashlytics, a service provided by Google LLC, to collect anonymous crash reports when the Application encounters an error. Crash reporting is disabled by default and is only enabled after you explicitly agree to it during the onboarding process. Crash data includes device model, operating system version, stack traces, and application state at the time of the crash. No personal data is included in crash reports.</p>
+
+<strong>Push Notifications</strong>
+<p>The Application uses Firebase Cloud Messaging (FCM), a service provided by Google LLC, to send push notifications to your device. To enable this functionality, a unique device token is generated and stored on the Service Provider's servers. You may disable push notifications through your device's system settings at any time.</p>
+
+<strong>Third-Party Services</strong>
+<p>The Application relies on the following third-party services that have their own Terms and Conditions:</p>
+<ul>
+  <li><a href="https://firebase.google.com/terms" target="_blank">Firebase (Google LLC)</a> - Crash reporting (Crashlytics) and push notifications (Cloud Messaging)</li>
+  <li><a href="https://policies.google.com/terms" target="_blank">Google Play Services</a> (Android only)</li>
+</ul>
 
 <strong>Service Modifications and Charges</strong>
 <p>The Service Provider is dedicated to ensuring that the Application is as beneficial and efficient as possible. As such, they reserve the right to modify the Application or charge for their services at any time and for any reason. The Service Provider assures you that any charges for the Application or its services will be clearly communicated to you.</p>
