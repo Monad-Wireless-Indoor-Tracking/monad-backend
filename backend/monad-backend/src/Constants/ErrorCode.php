@@ -22,6 +22,7 @@ class ErrorCode
     public const AUTH_TOKEN_INVALID = 'AUTH_005';
     public const AUTH_UNAUTHORIZED = 'AUTH_006';
     public const AUTH_EMAIL_ALREADY_EXISTS = 'AUTH_007';
+    public const AUTH_ACCOUNT_DELETED = 'AUTH_008';
 
     // Validation Errors (100-199)
     public const VALIDATION_EMAIL_REQUIRED = 'VALIDATION_100';
@@ -65,6 +66,7 @@ class ErrorCode
             self::AUTH_TOKEN_INVALID => 'Authentication token is invalid',
             self::AUTH_UNAUTHORIZED => 'Authentication required',
             self::AUTH_EMAIL_ALREADY_EXISTS => 'Email address already registered',
+            self::AUTH_ACCOUNT_DELETED => 'Account has been deleted',
 
             self::VALIDATION_EMAIL_REQUIRED => 'Email address is required',
             self::VALIDATION_EMAIL_INVALID => 'Email address format is invalid',

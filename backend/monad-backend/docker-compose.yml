@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monad_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: monad_db
+      POSTGRES_USER: monad_user
+      POSTGRES_PASSWORD: monad_password_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monad_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "monad_db", "-U", "monad_user"]
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      interval: 10s
+
+  app:
+    build: .
+    container_name: monad_symfony
+    restart: unless-stopped
+    ports:
+      - "80:8000"
+    volumes:
+      - .:/var/www/html
+      - symfony_var:/var/www/html/var
+    environment:
+      APP_ENV: dev
+    networks:
+      - monad_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  symfony_var:
+
+networks:
+  monad_network:
+    driver: bridge

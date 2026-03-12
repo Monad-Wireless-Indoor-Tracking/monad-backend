@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monad Scan - Indoor Positioning Research at FIIT STU</title>
+  <meta name="description" content="Monad Scan is a mobile research app collecting BLE beacon data through interactive quests at the FIIT STU library in Bratislava. Contributing to indoor positioning and WiFi channel state analysis research.">
+  <meta name="keywords" content="BLE, Bluetooth Low Energy, indoor positioning, FIIT STU, Bratislava, research, beacons, triangulation, CSI, channel state information, diploma thesis">
+  <meta property="og:title" content="Monad Scan - Indoor Positioning Research">
+  <meta property="og:description" content="Help advance indoor positioning research by collecting BLE beacon data through interactive quests at FIIT STU Bratislava.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="http://monad.martinvanco.sk">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #5B6ECC;
+      --primary-light: #EFF1F8;
+      --primary-50: rgba(91, 110, 204, 0.08);
+      --accent: #FFA033;
+      --accent-light: rgba(255, 160, 51, 0.12);
+      --dark: #0F142F;
+      --dark-80: rgba(15, 20, 47, 0.8);
+      --dark-60: rgba(15, 20, 47, 0.6);
+      --dark-40: rgba(15, 20, 47, 0.4);
+      --dark-12: rgba(15, 20, 47, 0.12);
+      --dark-06: rgba(15, 20, 47, 0.06);
+      --bg: #FAFBFD;
+      --white: #FFFFFF;
+      --surface: #F4F5F9;
+    }
+
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+
+    body {
+      font-family: 'Onest', sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* ---- NAV ---- */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 64px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(91,110,204,0.08);
+      transition: box-shadow 0.3s;
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; max-width: 1080px; padding: 0 2rem;
+    }
+    nav.scrolled { box-shadow: 0 2px 20px rgba(91,110,204,0.08); }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--dark); }
+    .nav-logo svg { height: 26px; width: auto; }
+    .nav-links { display: flex; gap: 2rem; align-items: center; }
+    .nav-links a { text-decoration: none; color: var(--dark-40); font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--primary); }
+    .mobile-toggle { display: none; background: none; border: none; cursor: pointer; width: 32px; height: 32px; flex-direction: column; justify-content: center; align-items: center; gap: 5px; }
+    .mobile-toggle span { display: block; width: 20px; height: 2px; background: var(--dark); border-radius: 1px; transition: transform 0.3s, opacity 0.3s; }
+
+    /* ---- SECTIONS ---- */
+    section { padding: 6rem 2rem; overflow: hidden; position: relative; }
+    .container { max-width: 1080px; margin: 0 auto; }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--primary); margin-bottom: 1rem;
+    }
+    .section-label::before { content: ''; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); opacity: 0.4; }
+
+    /* ---- HERO ---- */
+    .hero {
+      display: flex; align-items: center;
+      padding: 8rem 2rem 6rem; position: relative;
+      background: var(--white);
+      color: var(--dark);
+      overflow: visible;
+    }
+
+    .hero .container { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; position: relative; z-index: 1; }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; background: rgba(91, 110, 204, 0.08);
+      border: 1px solid rgba(91, 110, 204, 0.15);
+      border-radius: 100px; font-size: 0.8rem; font-weight: 500;
+      color: var(--primary); margin-bottom: 1.5rem;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    h1 { font-size: clamp(2.4rem, 5vw, 3.4rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 1.25rem; }
+    h1 .accent-text { color: var(--primary); }
+    h1 .primary-text { color: var(--primary); opacity: 0.7; }
+
+    .hero-desc { font-size: 1.1rem; line-height: 1.7; color: var(--dark-60); max-width: 480px; margin-bottom: 2rem; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 28px; border-radius: 12px; font-family: 'Onest', sans-serif;
+      font-size: 0.9rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-accent { background: var(--accent); color: var(--dark); box-shadow: 0 2px 16px rgba(255, 160, 51, 0.3); }
+    .btn-accent:hover { box-shadow: 0 4px 24px rgba(255, 160, 51, 0.45); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: rgba(255,255,255,0.8); border: 1.5px solid rgba(255,255,255,0.15); }
+    .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.25); }
+    .btn-primary { background: var(--primary); color: var(--white); box-shadow: 0 2px 12px rgba(91,110,204,0.25); }
+    .btn-primary:hover { box-shadow: 0 4px 20px rgba(91,110,204,0.35); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--dark-80); border: 1.5px solid var(--dark-12); }
+    .btn-ghost:hover { background: var(--dark-06); }
+
+    /* Hero visual */
+    .hero-visual { position: relative; display: flex; justify-content: center; align-items: center; align-self: center; }
+    .hero-illustration { width: 100%; max-width: 580px; }
+    .hero-illustration svg { width: 100%; height: auto; }
+
+    @keyframes float-card { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    @keyframes signal-fade { 0%, 100% { opacity: 0.08; } 50% { opacity: 0.35; } }
+    @keyframes dash-move { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -14; } }
+    .hero-float-1 { animation: float-card 4s ease-in-out infinite; }
+    .hero-float-2 { animation: float-card 4s ease-in-out 0.8s infinite; }
+    .hero-float-3 { animation: float-card 4s ease-in-out 1.6s infinite; }
+    .hero-signal { animation: signal-fade 2.5s ease-in-out infinite; }
+    .hero-signal-d1 { animation-delay: 0s; }
+    .hero-signal-d2 { animation-delay: 0.4s; }
+    .hero-signal-d3 { animation-delay: 0.8s; }
+    .tri-line { animation: dash-move 1.5s linear infinite; }
+
+    /* ---- ABOUT ---- */
+    .about { background: var(--white); position: relative; overflow: hidden; }
+    .about::before {
+      content: ''; position: absolute; top: -100px; left: -150px;
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(91,110,204,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .about::after {
+      content: ''; position: absolute; bottom: -60px; right: -80px;
+      width: 300px; height: 300px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,160,51,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .about .container { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+    .about h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1.25rem; }
+    .about p { color: var(--dark-60); font-size: 1rem; line-height: 1.75; margin-bottom: 1rem; }
+    .about p:last-child { margin-bottom: 0; }
+
+    /* About illustration - 3 slides stacked */
+    .about-illustration { width: 100%; position: relative; aspect-ratio: 400 / 340; margin-bottom: 2.5rem; }
+    .about-slide {
+      position: absolute; inset: 0;
+      opacity: 0; transform: translateY(24px);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      pointer-events: none;
+    }
+    .about-slide.active {
+      opacity: 1; transform: translateY(0);
+      pointer-events: auto;
+    }
+    .about-slide svg { width: 100%; height: 100%; }
+    /* Step controls bar: dots left, arrows right */
+    .about-controls {
+      position: absolute; bottom: -2.5rem; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .about-dots { display: flex; gap: 6px; align-items: center; }
+    .about-dot {
+      height: 8px; border-radius: 4px; border: none; padding: 0;
+      cursor: pointer; transition: width 0.3s, background 0.3s;
+      width: 8px; background: var(--dark-12);
+    }
+    .about-dot.active { width: 28px; background: var(--primary); }
+    .about-dot:hover:not(.active) { background: var(--dark-40); }
+    .about-arrows { display: flex; gap: 6px; }
+    .about-arrow {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid var(--dark-12); background: var(--white);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+      font-family: 'Onest', sans-serif;
+    }
+    .about-arrow:hover { border-color: var(--primary); background: var(--primary-light); }
+    .about-arrow svg { width: 14px; height: 14px; stroke: var(--dark-60); stroke-width: 2; fill: none; }
+
+
+    /* ---- HOW IT WORKS ---- */
+    .how-it-works { position: relative; overflow: hidden; }
+    .how-it-works .section-label { display: flex; justify-content: center; }
+    .how-it-works h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 3rem; text-align: center; }
+    .process { display: flex; align-items: flex-start; gap: 0; position: relative; z-index: 1; }
+    .process-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+    .process-num {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: var(--white);
+      background: var(--primary); margin-bottom: 1.25rem; position: relative; z-index: 2;
+    }
+    /* Connector line between steps */
+    .process-step:not(:last-child)::after {
+      content: ''; position: absolute; top: 20px;
+      left: calc(50% + 24px); right: calc(-50% + 24px);
+      height: 2px; background: var(--dark-12); z-index: 1;
+    }
+    .process-step:not(:last-child)::before {
+      content: ''; position: absolute; top: 15px;
+      right: calc(-50% + 18px);
+      width: 8px; height: 8px;
+      border-right: 2px solid var(--dark-12); border-bottom: 2px solid var(--dark-12);
+      transform: rotate(-45deg); z-index: 2;
+    }
+    .process-icon {
+      display: flex; align-items: center; justify-content: center;
+      width: 48px; height: 48px; border-radius: 14px; margin-bottom: 1rem;
+    }
+    .process-icon svg { width: 22px; height: 22px; }
+    .process-icon.download { background: rgba(91,110,204,0.1); }
+    .process-icon.quest { background: rgba(255,160,51,0.1); }
+    .process-icon.collect { background: rgba(91,110,204,0.1); }
+    .process-icon.upload { background: rgba(15,20,47,0.06); }
+    .process-step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .process-step p { font-size: 0.82rem; color: var(--dark-60); line-height: 1.6; max-width: 200px; }
+
+    /* ---- DATA / WHAT WE COLLECT ---- */
+    .data-section { background: var(--dark); color: var(--white); position: relative; overflow: hidden; }
+    .data-section::before {
+      content: ''; position: absolute; top: -80px; left: -100px;
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(91,110,204,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .data-section::after {
+      content: ''; position: absolute; bottom: -120px; right: -60px;
+      width: 500px; height: 500px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,160,51,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .data-section .section-label { color: var(--accent); display: flex; justify-content: center; }
+    .data-section .section-label::before { background: var(--accent); }
+    .data-section h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; line-height: 1.2; margin-bottom: 1rem; text-align: center; }
+    .data-section .lead { color: rgba(255,255,255,0.55); font-size: 1.05rem; max-width: 560px; margin-bottom: 3rem; line-height: 1.7; text-align: center; margin-left: auto; margin-right: auto; }
+
+    .data-layout { display: flex; flex-direction: column; align-items: center; gap: 3rem; }
+    .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; width: 100%; }
+    .data-card {
+      padding: 1.75rem; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+      transition: background 0.25s;
+    }
+    .data-card:hover { background: rgba(255,255,255,0.07); }
+    .data-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+    .data-icon.ble { background: rgba(91,110,204,0.2); }
+    .data-icon.signal { background: rgba(255,160,51,0.2); }
+    .data-icon.meta { background: rgba(255,255,255,0.1); }
+    .data-icon svg { width: 20px; height: 20px; }
+    .data-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .data-card p { font-size: 0.82rem; color: rgba(255,255,255,0.45); line-height: 1.6; }
+
+    /* Data phone illustration */
+    .data-phone { position: relative; width: 100%; max-width: 560px; }
+    .data-phone svg { width: 100%; height: auto; }
+
+    /* ---- TECHNOLOGY ---- */
+    .tech { background: var(--white); position: relative; overflow: hidden; }
+    .tech .section-label { display: flex; justify-content: center; }
+    .tech h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1rem; text-align: center; }
+    .tech .lead { text-align: center; color: var(--dark-60); max-width: 600px; margin: 0 auto 2.5rem; font-size: 1.05rem; line-height: 1.7; }
+    .tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--dark-06); border-radius: 16px; overflow: hidden; border: 1px solid var(--dark-06); }
+    .tech-card {
+      padding: 1.5rem 1.75rem; background: var(--white);
+      transition: background 0.25s;
+    }
+    .tech-card:hover { background: var(--bg); }
+    .tech-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 0.75rem; }
+    .tech-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .tech-icon svg { width: 18px; height: 18px; }
+    .tech-icon.triangulation { background: rgba(91,110,204,0.1); }
+    .tech-icon.wifi { background: rgba(255,160,51,0.1); }
+    .tech-icon.qr { background: rgba(15,20,47,0.06); }
+    .tech-icon.dataset { background: rgba(91,110,204,0.1); }
+    .tech-card h3 { font-size: 0.95rem; font-weight: 700; }
+    .tech-card p { font-size: 0.82rem; color: var(--dark-60); line-height: 1.65; }
+
+    /* ---- CTA ---- */
+    .cta-section { text-align: center; background: var(--bg); }
+    .cta-box {
+      padding: 4rem 3rem; border-radius: 24px;
+      background: linear-gradient(135deg, var(--dark) 0%, #1a2045 50%, var(--dark) 100%);
+      color: var(--white); position: relative; overflow: hidden;
+    }
+    .cta-box::before {
+      content: ''; position: absolute; top: -50%; right: -20%;
+      width: 500px; height: 500px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,160,51,0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .cta-box::after {
+      content: ''; position: absolute; bottom: -40%; left: -15%;
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(91,110,204,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .cta-box h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; margin-bottom: 0.75rem; position: relative; }
+    .cta-box p { color: rgba(255,255,255,0.6); max-width: 480px; margin: 0 auto 2rem; font-size: 1rem; line-height: 1.6; position: relative; }
+    .btn-accent-cta { background: var(--accent); color: var(--dark); font-weight: 700; box-shadow: 0 2px 16px rgba(255,160,51,0.3); position: relative; }
+    .btn-accent-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(255,160,51,0.45); }
+
+    /* ---- FOOTER ---- */
+    footer { padding: 3rem 2rem 2rem; background: var(--bg); border-top: 1px solid var(--dark-06); }
+    .footer-inner { max-width: 1080px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .footer-left { display: flex; align-items: center; gap: 10px; }
+    .footer-left svg { height: 20px; width: auto; opacity: 0.5; }
+    .footer-copy { font-size: 0.8rem; color: var(--dark-40); }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { font-size: 0.8rem; color: var(--dark-40); text-decoration: none; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--primary); }
+
+    /* Hero mobile decorative circles */
+    .hero-mobile-circles { display: none; pointer-events: none; }
+    .hero-mobile-circles .circle {
+      position: absolute; border-radius: 50%;
+    }
+    .hero-mobile-circles .c1 {
+      width: 200px; height: 200px; top: -40px; right: -60px;
+      border: 1.5px solid rgba(91,110,204,0.12);
+    }
+    .hero-mobile-circles .c2 {
+      width: 120px; height: 120px; bottom: 20px; left: -40px;
+      border: 1.5px solid rgba(255,160,51,0.12);
+    }
+    .hero-mobile-circles .c3 {
+      width: 80px; height: 80px; top: 30%; right: 10%;
+      background: radial-gradient(circle, rgba(91,110,204,0.06) 0%, transparent 70%);
+    }
+    .hero-mobile-circles .c4 {
+      width: 160px; height: 160px; bottom: -30px; right: 20%;
+      background: radial-gradient(circle, rgba(255,160,51,0.05) 0%, transparent 70%);
+    }
+    .hero-mobile-circles .dot {
+      position: absolute; border-radius: 50%;
+    }
+    .hero-mobile-circles .d1 { width: 6px; height: 6px; background: var(--primary); opacity: 0.2; top: 25%; left: 15%; }
+    .hero-mobile-circles .d2 { width: 5px; height: 5px; background: var(--accent); opacity: 0.2; top: 40%; right: 20%; }
+    .hero-mobile-circles .d3 { width: 4px; height: 4px; background: var(--primary); opacity: 0.15; bottom: 30%; left: 30%; }
+
+    /* ---- ANIMATIONS ---- */
+    .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 900px) {
+      .hero .container { grid-template-columns: 1fr; gap: 0; text-align: center; }
+      .hero-desc { margin-left: auto; margin-right: auto; }
+      .hero-actions { justify-content: center; }
+      .hero-visual { display: none; }
+      .hero { position: relative; }
+      .hero-mobile-circles { display: block; }
+      .about .container { grid-template-columns: 1fr; }
+      .about-illustration { max-width: 400px; margin: 0 auto; }
+      .process { flex-direction: column; gap: 0; padding-left: 0; }
+      .process-step {
+        flex: none; flex-direction: row; align-items: flex-start; text-align: left;
+        gap: 1rem; padding-bottom: 2rem; padding-left: 0;
+      }
+      .process-step:last-child { padding-bottom: 0; }
+      .process-num { margin-bottom: 0; flex-shrink: 0; }
+      .process-icon { display: none; }
+      .process-text { flex: 1; padding-top: 0.5rem; }
+      .process-step p { max-width: none; }
+      /* Vertical connector line */
+      .process-step:not(:last-child)::after {
+        left: 19px; top: 40px; bottom: 0; right: auto;
+        width: 0; height: auto;
+        border-left: 1px dashed var(--dark-12); background: none;
+      }
+      .process-step:not(:last-child)::before { display: none; }
+      .data-grid { grid-template-columns: 1fr; }
+      .data-phone { max-width: 400px; }
+      .tech-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      section { padding: 4rem 1.25rem; }
+      .nav-inner { padding: 0 1.25rem; }
+      .nav-links {
+        display: none; flex-direction: column; justify-content: center; align-items: flex-start;
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #FFFFFF;
+        padding: 6rem 2.5rem 4rem;
+        gap: 1.5rem; z-index: 9999;
+      }
+      .nav-links::after {
+        content: ''; position: absolute; bottom: -60px; right: -60px;
+        width: 200px; height: 200px; border-radius: 50%;
+        border: 1.5px solid rgba(91,110,204,0.1);
+        pointer-events: none;
+      }
+      .nav-links.open { display: flex; animation: menu-in 0.3s ease forwards; }
+      .nav-links a {
+        font-size: 2rem; font-weight: 700; color: var(--dark);
+        padding: 0.5rem 0;
+        opacity: 0; transform: translateY(16px);
+        transition: opacity 0.3s ease, transform 0.3s ease, color 0.2s;
+      }
+      .nav-links.open a { opacity: 1; transform: translateY(0); }
+      .nav-links.open a:nth-child(1) { transition-delay: 0.06s; }
+      .nav-links.open a:nth-child(2) { transition-delay: 0.12s; }
+      .nav-links.open a:nth-child(3) { transition-delay: 0.18s; }
+      .nav-links.open a:nth-child(4) { transition-delay: 0.24s; }
+      .nav-links.open a:nth-child(5) { transition-delay: 0.3s; }
+      .nav-links a:hover { color: var(--primary); }
+      .mobile-toggle { display: flex; position: relative; z-index: 10000; }
+      .mobile-toggle.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+      .mobile-toggle.active span:nth-child(2) { opacity: 0; }
+      .mobile-toggle.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+      @keyframes menu-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+      .cta-box { padding: 3rem 1.5rem; }
+      .footer-inner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-inner">
+  <a href="/" class="nav-logo">
+    <svg viewBox="0 0 91 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.697,22.5V6.477H5.997L10.274,14.217L14.506,6.477H18.648V22.5H15.412V10.8L10.863,18.924H9.55L4.934,10.8V22.5H1.697ZM26.487,22.658C25.28,22.658 24.224,22.417 23.319,21.934C22.414,21.436 21.712,20.735 21.214,19.83C20.717,18.909 20.468,17.823 20.468,16.571C20.468,15.288 20.717,14.187 21.214,13.267C21.727,12.331 22.437,11.615 23.342,11.117C24.247,10.619 25.288,10.37 26.465,10.37C27.672,10.37 28.72,10.626 29.611,11.139C30.501,11.652 31.195,12.369 31.692,13.289C32.19,14.21 32.439,15.311 32.439,16.593C32.439,17.846 32.19,18.932 31.692,19.852C31.21,20.757 30.523,21.451 29.633,21.934C28.758,22.417 27.709,22.658 26.487,22.658ZM26.442,19.762C27.136,19.762 27.694,19.611 28.117,19.309C28.539,19.007 28.841,18.615 29.022,18.132C29.218,17.634 29.316,17.114 29.316,16.571C29.316,16.028 29.218,15.507 29.022,15.009C28.841,14.511 28.539,14.104 28.117,13.787C27.709,13.455 27.151,13.289 26.442,13.289C25.763,13.289 25.212,13.455 24.79,13.787C24.368,14.104 24.058,14.511 23.862,15.009C23.681,15.507 23.591,16.028 23.591,16.571C23.591,17.129 23.681,17.649 23.862,18.132C24.058,18.615 24.368,19.007 24.79,19.309C25.212,19.611 25.763,19.762 26.442,19.762ZM33.789,22.5V10.574H36.754L36.912,11.954C37.244,11.547 37.621,11.23 38.043,11.004C38.481,10.762 38.918,10.596 39.356,10.506C39.809,10.415 40.216,10.37 40.578,10.37C41.725,10.37 42.615,10.619 43.249,11.117C43.897,11.615 44.357,12.286 44.629,13.131C44.916,13.961 45.059,14.889 45.059,15.914V22.5H41.891V16.322C41.891,15.96 41.861,15.598 41.8,15.236C41.74,14.873 41.627,14.542 41.461,14.24C41.31,13.938 41.091,13.697 40.804,13.516C40.518,13.335 40.141,13.244 39.673,13.244C39.069,13.244 38.564,13.395 38.157,13.697C37.749,13.998 37.447,14.406 37.251,14.919C37.055,15.432 36.957,15.997 36.957,16.616V22.5H33.789ZM50.591,22.658C50.048,22.658 49.52,22.59 49.007,22.455C48.509,22.304 48.064,22.078 47.672,21.776C47.28,21.474 46.971,21.097 46.744,20.644C46.518,20.192 46.405,19.664 46.405,19.06C46.405,18.245 46.571,17.597 46.903,17.114C47.235,16.616 47.68,16.239 48.238,15.982C48.796,15.726 49.437,15.552 50.161,15.462C50.901,15.371 51.663,15.326 52.447,15.326H54.167C54.167,14.889 54.084,14.504 53.918,14.172C53.767,13.825 53.534,13.561 53.217,13.38C52.9,13.184 52.493,13.086 51.995,13.086C51.678,13.086 51.368,13.131 51.067,13.221C50.78,13.297 50.539,13.41 50.343,13.561C50.146,13.712 50.018,13.908 49.958,14.149H46.744C46.835,13.485 47.046,12.92 47.378,12.452C47.71,11.969 48.125,11.577 48.623,11.275C49.12,10.973 49.664,10.755 50.252,10.619C50.855,10.468 51.474,10.392 52.108,10.392C53.843,10.392 55.125,10.89 55.955,11.886C56.785,12.867 57.2,14.262 57.2,16.073V22.5H54.348L54.303,20.961C53.926,21.489 53.496,21.874 53.013,22.115C52.545,22.357 52.093,22.507 51.655,22.568C51.218,22.628 50.863,22.658 50.591,22.658ZM51.316,20.146C51.844,20.146 52.326,20.041 52.764,19.83C53.202,19.618 53.549,19.332 53.805,18.97C54.062,18.608 54.19,18.2 54.19,17.747V17.453H52.017C51.7,17.453 51.391,17.468 51.089,17.499C50.803,17.529 50.539,17.589 50.297,17.68C50.071,17.755 49.89,17.883 49.754,18.064C49.618,18.245 49.55,18.487 49.55,18.788C49.55,19.09 49.626,19.347 49.777,19.558C49.943,19.754 50.161,19.905 50.433,20.011C50.705,20.101 50.999,20.146 51.316,20.146ZM63.907,22.658C62.7,22.658 61.696,22.387 60.897,21.844C60.112,21.285 59.524,20.546 59.132,19.626C58.739,18.691 58.543,17.657 58.543,16.525C58.543,15.334 58.754,14.278 59.177,13.357C59.599,12.422 60.225,11.69 61.055,11.162C61.885,10.634 62.918,10.37 64.156,10.37C64.578,10.37 64.993,10.423 65.4,10.528C65.823,10.619 66.207,10.762 66.554,10.958C66.916,11.139 67.226,11.381 67.482,11.682V6.477H70.65V22.5H67.573L67.527,21.165C67.256,21.512 66.924,21.798 66.532,22.025C66.155,22.236 65.747,22.394 65.31,22.5C64.872,22.606 64.404,22.658 63.907,22.658ZM64.54,19.807C65.219,19.807 65.77,19.649 66.192,19.332C66.63,19.015 66.954,18.608 67.165,18.11C67.377,17.612 67.482,17.076 67.482,16.503C67.482,15.914 67.377,15.379 67.165,14.896C66.969,14.398 66.652,14.006 66.215,13.719C65.793,13.417 65.234,13.267 64.54,13.267C63.846,13.267 63.288,13.425 62.866,13.742C62.443,14.059 62.141,14.474 61.96,14.987C61.794,15.484 61.711,16.02 61.711,16.593C61.711,17.016 61.757,17.423 61.847,17.815C61.953,18.193 62.119,18.532 62.345,18.834C62.571,19.136 62.866,19.377 63.228,19.558C63.59,19.724 64.027,19.807 64.54,19.807Z" fill="#0F142F"/>
+      <path d="M75.322,22.772C74.84,22.772 74.425,22.613 74.078,22.296C73.746,21.979 73.58,21.549 73.58,21.006C73.58,20.463 73.753,20.033 74.1,19.716C74.447,19.385 74.862,19.219 75.345,19.219C75.828,19.219 76.235,19.385 76.567,19.716C76.899,20.033 77.065,20.463 77.065,21.006C77.065,21.549 76.899,21.979 76.567,22.296C76.235,22.613 75.82,22.772 75.322,22.772Z" fill="#5B6ECC"/>
+      <path d="M80.731,21.608C80.731,18.243 78.003,15.515 74.638,15.515" stroke="#5B6ECC" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+      <path d="M84.648,21.172C84.648,15.884 80.361,11.598 75.073,11.598" stroke="#5B6ECC" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+      <path d="M89,21.608C89,13.916 82.765,7.681 75.073,7.681" stroke="#5B6ECC" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+    </svg>
+  </a>
+  <div class="nav-links" id="navLinks">
+    <a href="#about">About</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#data">Data</a>
+    <a href="#technology">Technology</a>
+    <a href="#participate">Participate</a>
+  </div>
+  <button class="mobile-toggle" id="mobileToggle" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-mobile-circles">
+    <div class="circle c1"></div>
+    <div class="circle c2"></div>
+    <div class="circle c3"></div>
+    <div class="circle c4"></div>
+    <div class="dot d1"></div>
+    <div class="dot d2"></div>
+    <div class="dot d3"></div>
+  </div>
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-badge"><span class="dot"></span> Research Experiment</div>
+      <h1>Mapping indoor spaces with <span class="accent-text">Bluetooth</span> signals</h1>
+      <p class="hero-desc">Monad Scan is a mobile research app that collects BLE beacon data through interactive quests. Help us build precise indoor positioning datasets at the FIIT STU library in Bratislava.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary"><svg width="18" height="22" viewBox="0 0 814 1000" fill="currentColor"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57.8-155.5-127.4c-58.3-81-105.7-207-105.7-326.4C0 377 73.6 244.1 184.4 179.7c54.7-32.4 121.5-54.7 193.9-57.2 64.7-1.3 122.1 43.4 161 43.4 37.6 0 108.2-43.4 189.9-43.4 30.6 0 140.5 9 207 68.4zm-247.4-129.5c31.3-36.9 53.4-88.1 53.4-139.3 0-7.1-.6-14.3-1.9-20.1-50.9 1.9-110.8 33.7-147.1 75.8-28.7 32.4-55.3 83.6-55.3 135.5 0 7.8.6 15.6 1.3 18.2 2.5.6 6.4 1.3 10.2 1.3 45.9 0 103.2-30.6 139.4-71.4z"/></svg> App Store</a>
+        <a href="#" class="btn btn-primary"><svg width="18" height="20" viewBox="0 0 512 512" fill="currentColor"><path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/></svg> Google Play</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-illustration">
+        <svg viewBox="10 10 450 390" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Signal arcs -->
+          <circle cx="80" cy="80" r="35" stroke="#5B6ECC" stroke-width="1" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="80" cy="80" r="60" stroke="#5B6ECC" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="380" cy="100" r="35" stroke="#5B6ECC" stroke-width="1" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="380" cy="100" r="60" stroke="#5B6ECC" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="100" cy="320" r="35" stroke="#FFA033" stroke-width="1" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="100" cy="320" r="60" stroke="#FFA033" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="360" cy="300" r="35" stroke="#FFA033" stroke-width="1" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="230" cy="70" r="35" stroke="#5B6ECC" stroke-width="1" fill="none" class="hero-signal hero-signal-d3"/>
+
+          <!-- Animated triangulation lines -->
+          <line x1="80" y1="80" x2="220" y2="210" stroke="#5B6ECC" stroke-width="1" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+          <line x1="380" y1="100" x2="220" y2="210" stroke="#5B6ECC" stroke-width="1" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+          <line x1="100" y1="320" x2="220" y2="210" stroke="#FFA033" stroke-width="1" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+          <line x1="360" y1="300" x2="220" y2="210" stroke="#FFA033" stroke-width="1" stroke-dasharray="4 3" opacity="0.3" class="tri-line"/>
+          <line x1="230" y1="70" x2="220" y2="210" stroke="#5B6ECC" stroke-width="1" stroke-dasharray="4 3" opacity="0.3" class="tri-line"/>
+
+          <!-- Beacon dots -->
+          <circle cx="80" cy="80" r="9" fill="#5B6ECC"/><circle cx="80" cy="80" r="4" fill="white"/>
+          <circle cx="380" cy="100" r="9" fill="#5B6ECC"/><circle cx="380" cy="100" r="4" fill="white"/>
+          <circle cx="100" cy="320" r="9" fill="#FFA033"/><circle cx="100" cy="320" r="4" fill="white"/>
+          <circle cx="360" cy="300" r="9" fill="#FFA033"/><circle cx="360" cy="300" r="4" fill="white"/>
+          <circle cx="230" cy="70" r="9" fill="#5B6ECC"/><circle cx="230" cy="70" r="4" fill="white"/>
+
+          <!-- User position -->
+          <circle cx="220" cy="210" r="18" fill="#FFA033" opacity="0.1"/>
+          <circle cx="220" cy="210" r="10" fill="#FFA033" opacity="0.25"/>
+          <circle cx="220" cy="210" r="5" fill="#FFA033"/>
+
+          <!-- Floating data cards -->
+          <g class="hero-float-1">
+            <circle cx="292" cy="166" r="10" fill="rgba(91,110,204,0.15)"/>
+            <path d="M289 166l2 2 4-4" stroke="#5B6ECC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="310" y="161" width="55" height="5" rx="2.5" fill="#0F142F" opacity="0.3"/>
+            <rect x="310" y="171" width="38" height="4" rx="2" fill="#0F142F" opacity="0.12"/>
+            <rect x="282" y="192" width="80" height="4" rx="2" fill="#5B6ECC" opacity="0.1"/>
+            <rect x="282" y="192" width="56" height="4" rx="2" fill="#5B6ECC" opacity="0.35"/>
+            <text x="408" y="196" font-family="Onest, sans-serif" font-size="9" font-weight="600" fill="#5B6ECC" text-anchor="end">-42 dBm</text>
+          </g>
+          <g class="hero-float-2">
+            <circle cx="62" cy="186" r="10" fill="rgba(255,160,51,0.15)"/>
+            <path d="M59 186h6M62 183v6" stroke="#FFA033" stroke-width="1.5" stroke-linecap="round"/>
+            <rect x="80" y="181" width="64" height="5" rx="2.5" fill="#0F142F" opacity="0.3"/>
+            <rect x="80" y="191" width="42" height="4" rx="2" fill="#0F142F" opacity="0.12"/>
+            <text x="62" y="218" font-family="Onest, sans-serif" font-size="8" font-weight="500" fill="#FFA033">MONAD3</text>
+          </g>
+          <g class="hero-float-3">
+            <circle cx="272" cy="293" r="10" fill="rgba(91,110,204,0.08)"/>
+            <circle cx="272" cy="293" r="5" stroke="rgba(91,110,204,0.3)" stroke-width="1.2" fill="none"/>
+            <path d="M272 290v3l2 1.5" stroke="rgba(91,110,204,0.3)" stroke-width="1.2" stroke-linecap="round"/>
+            <rect x="290" y="288" width="72" height="5" rx="2.5" fill="#0F142F" opacity="0.3"/>
+            <rect x="290" y="298" width="108" height="4" rx="2" fill="#0F142F" opacity="0.08"/>
+            <text x="398" y="312" font-family="monospace" font-size="7.5" fill="#0F142F" opacity="0.15" text-anchor="end">1710254892341</text>
+          </g>
+
+          <!-- Beacon labels -->
+          <text x="80" y="62" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.6">B1</text>
+          <text x="380" y="82" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.6">B2</text>
+          <text x="100" y="346" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.6">B3</text>
+          <text x="360" y="324" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.6">B4</text>
+          <text x="230" y="52" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.6">B5</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">About the Experiment</span>
+      <h2>Indoor positioning research powered by you</h2>
+      <p>Monad Scan is part of a <strong>Master's thesis research project</strong> at the Faculty of Informatics and Information Technologies (FIIT), Slovak University of Technology in Bratislava. The goal is to build a <strong>high-quality reference dataset</strong> for indoor positioning systems.</p>
+      <p>We have deployed <strong>BLE beacons</strong> throughout the student library at FIIT. When participants complete quests in the app, their devices passively collect <strong>Bluetooth advertisement packets</strong> from these beacons. This data enables precise location estimation through triangulation and serves as ground truth for advanced <strong>WiFi Channel State Information (CSI)</strong> analysis.</p>
+      <p>The collected dataset will help validate and improve <strong>indoor positioning techniques</strong> that could one day navigate people through airports, hospitals, shopping centers, and other complex indoor environments - <strong>without GPS</strong>.</p>
+    </div>
+    <div class="fade-in">
+      <div class="about-illustration">
+        <!-- SLIDE 1: Data Gathering -->
+        <div class="about-slide active">
+          <svg viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Step label -->
+            <rect x="120" y="6" width="160" height="24" rx="12" fill="rgba(91,110,204,0.08)" stroke="rgba(91,110,204,0.12)" stroke-width="0.5"/>
+            <text x="200" y="22" font-family="Onest,sans-serif" font-size="9" font-weight="600" fill="#5B6ECC" text-anchor="middle">1. Data Gathering</text>
+            <!-- Beacons with pulsing signals -->
+            <circle cx="80" cy="80" r="22" stroke="#5B6ECC" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d1"/>
+            <circle cx="80" cy="80" r="38" stroke="#5B6ECC" stroke-width="0.4" fill="none" class="hero-signal hero-signal-d2"/>
+            <circle cx="80" cy="80" r="7" fill="#5B6ECC"/><circle cx="80" cy="80" r="3" fill="white"/>
+            <text x="80" y="60" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.5">B1</text>
+            <circle cx="320" cy="90" r="22" stroke="#FFA033" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d2"/>
+            <circle cx="320" cy="90" r="38" stroke="#FFA033" stroke-width="0.4" fill="none" class="hero-signal hero-signal-d3"/>
+            <circle cx="320" cy="90" r="7" fill="#FFA033"/><circle cx="320" cy="90" r="3" fill="white"/>
+            <text x="320" y="70" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.5">B2</text>
+            <circle cx="90" cy="270" r="22" stroke="#FFA033" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d3"/>
+            <circle cx="90" cy="270" r="38" stroke="#FFA033" stroke-width="0.4" fill="none" class="hero-signal hero-signal-d1"/>
+            <circle cx="90" cy="270" r="7" fill="#FFA033"/><circle cx="90" cy="270" r="3" fill="white"/>
+            <text x="90" y="254" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.5">B3</text>
+            <circle cx="310" cy="260" r="22" stroke="#5B6ECC" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d1"/>
+            <circle cx="310" cy="260" r="7" fill="#5B6ECC"/><circle cx="310" cy="260" r="3" fill="white"/>
+            <text x="310" y="244" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.5">B4</text>
+            <!-- Walking path -->
+            <path d="M100 280 L140 220 L200 180 L260 200 L300 130 L260 90" stroke="#5B6ECC" stroke-width="2" stroke-dasharray="6 4" fill="none" opacity="0.3"/>
+            <!-- Walking user dot -->
+            <circle r="8" fill="#5B6ECC" opacity="0.8"><animateMotion dur="6s" repeatCount="indefinite" path="M100,280 L140,220 L200,180 L260,200 L300,130 L260,90 L300,130 L260,200 L200,180 L140,220 L100,280"/></circle>
+            <circle r="3.5" fill="white"><animateMotion dur="6s" repeatCount="indefinite" path="M100,280 L140,220 L200,180 L260,200 L300,130 L260,90 L300,130 L260,200 L200,180 L140,220 L100,280"/></circle>
+            <!-- QR checkpoints -->
+            <rect x="130" y="210" width="18" height="18" rx="3" fill="white" stroke="#5B6ECC" stroke-width="1.2"/>
+            <rect x="135" y="215" width="3" height="3" fill="#5B6ECC"/><rect x="140" y="215" width="3" height="3" fill="#5B6ECC"/><rect x="135" y="220" width="3" height="3" fill="#5B6ECC"/>
+            <rect x="250" y="190" width="18" height="18" rx="3" fill="white" stroke="#FFA033" stroke-width="1.2"/>
+            <rect x="255" y="195" width="3" height="3" fill="#FFA033"/><rect x="260" y="195" width="3" height="3" fill="#FFA033"/><rect x="255" y="200" width="3" height="3" fill="#FFA033"/>
+            <!-- Data packets flowing -->
+            <circle r="2.5" fill="#5B6ECC" opacity="0.6"><animateMotion dur="2s" repeatCount="indefinite" path="M80,80 L200,180"/></circle>
+            <circle r="2.5" fill="#FFA033" opacity="0.6"><animateMotion dur="2.3s" repeatCount="indefinite" path="M320,90 L200,180"/></circle>
+            <circle r="2" fill="#FFA033" opacity="0.5"><animateMotion dur="2.6s" repeatCount="indefinite" path="M90,270 L200,180"/></circle>
+            <circle r="2" fill="#5B6ECC" opacity="0.5"><animateMotion dur="2.8s" repeatCount="indefinite" path="M310,260 L200,180"/></circle>
+            <!-- Phone icon collecting -->
+            <rect x="182" y="300" width="36" height="22" rx="4" fill="rgba(91,110,204,0.1)" stroke="rgba(91,110,204,0.2)" stroke-width="0.8"/>
+            <rect x="194" y="306" width="12" height="3" rx="1.5" fill="#5B6ECC" opacity="0.4"/>
+            <rect x="194" y="312" width="8" height="3" rx="1.5" fill="#5B6ECC" opacity="0.2"/>
+          </svg>
+        </div>
+        <!-- SLIDE 2: BLE Triangulation -->
+        <div class="about-slide">
+          <svg viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Step label -->
+            <rect x="110" y="6" width="180" height="24" rx="12" fill="rgba(91,110,204,0.08)" stroke="rgba(91,110,204,0.12)" stroke-width="0.5"/>
+            <text x="200" y="22" font-family="Onest,sans-serif" font-size="9" font-weight="600" fill="#5B6ECC" text-anchor="middle">2. BLE Triangulation</text>
+            <!-- 3 beacons in triangle layout -->
+            <circle cx="200" cy="60" r="8" fill="#5B6ECC"/><circle cx="200" cy="60" r="3.5" fill="white"/>
+            <text x="200" y="46" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.6">B1</text>
+            <circle cx="80" cy="260" r="8" fill="#5B6ECC"/><circle cx="80" cy="260" r="3.5" fill="white"/>
+            <text x="80" y="280" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.6">B2</text>
+            <circle cx="320" cy="260" r="8" fill="#FFA033"/><circle cx="320" cy="260" r="3.5" fill="white"/>
+            <text x="320" y="280" font-family="Onest,sans-serif" font-size="7" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.6">B3</text>
+            <!-- RSSI distance circles -->
+            <circle cx="200" cy="60" r="120" stroke="#5B6ECC" stroke-width="1" fill="none" opacity="0.12" stroke-dasharray="5 4"/>
+            <circle cx="80" cy="260" r="140" stroke="#5B6ECC" stroke-width="1" fill="none" opacity="0.12" stroke-dasharray="5 4"/>
+            <circle cx="320" cy="260" r="150" stroke="#FFA033" stroke-width="1" fill="none" opacity="0.12" stroke-dasharray="5 4"/>
+            <!-- Triangulation lines -->
+            <line x1="200" y1="60" x2="190" y2="175" stroke="#5B6ECC" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+            <line x1="80" y1="260" x2="190" y2="175" stroke="#5B6ECC" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+            <line x1="320" y1="260" x2="190" y2="175" stroke="#FFA033" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4" class="tri-line"/>
+            <!-- Estimated position - center -->
+            <circle cx="190" cy="175" r="20" fill="#FFA033" opacity="0.06"/>
+            <circle cx="190" cy="175" r="12" fill="#FFA033" opacity="0.12"/>
+            <circle cx="190" cy="175" r="5" fill="#FFA033"/>
+            <!-- RSSI value labels -->
+            <rect x="162" y="108" width="52" height="16" rx="4" fill="rgba(91,110,204,0.08)"/>
+            <text x="188" y="120" font-family="monospace" font-size="7" fill="#5B6ECC" text-anchor="middle">-42 dBm</text>
+            <rect x="102" y="210" width="52" height="16" rx="4" fill="rgba(91,110,204,0.08)"/>
+            <text x="128" y="222" font-family="monospace" font-size="7" fill="#5B6ECC" text-anchor="middle">-58 dBm</text>
+            <rect x="246" y="210" width="52" height="16" rx="4" fill="rgba(255,160,51,0.08)"/>
+            <text x="272" y="222" font-family="monospace" font-size="7" fill="#FFA033" text-anchor="middle">-51 dBm</text>
+            <!-- Formula hint -->
+            <rect x="100" y="300" width="200" height="22" rx="6" fill="rgba(91,110,204,0.05)"/>
+            <text x="200" y="315" font-family="monospace" font-size="7.5" fill="#5B6ECC" text-anchor="middle" opacity="0.5">RSSI = -10n log(d) + A</text>
+          </svg>
+        </div>
+        <!-- SLIDE 3: WiFi CSI Comparison -->
+        <div class="about-slide">
+          <svg viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Step label -->
+            <rect x="105" y="6" width="190" height="24" rx="12" fill="rgba(255,160,51,0.08)" stroke="rgba(255,160,51,0.12)" stroke-width="0.5"/>
+            <text x="200" y="22" font-family="Onest,sans-serif" font-size="9" font-weight="600" fill="#FFA033" text-anchor="middle">3. WiFi CSI Comparison</text>
+            <!-- WiFi APs -->
+            <circle cx="60" cy="60" r="6" fill="#FFA033" opacity="0.4"/>
+            <path d="M48 48 Q60 34 72 48" stroke="#FFA033" stroke-width="1.2" fill="none" opacity="0.2"/>
+            <path d="M42 48 Q60 28 78 48" stroke="#FFA033" stroke-width="0.8" fill="none" opacity="0.12"/>
+            <text x="60" y="78" font-family="Onest,sans-serif" font-size="6.5" fill="#FFA033" opacity="0.5" text-anchor="middle">AP1</text>
+            <circle cx="340" cy="60" r="6" fill="#FFA033" opacity="0.4"/>
+            <path d="M328 48 Q340 34 352 48" stroke="#FFA033" stroke-width="1.2" fill="none" opacity="0.2"/>
+            <path d="M322 48 Q340 28 358 48" stroke="#FFA033" stroke-width="0.8" fill="none" opacity="0.12"/>
+            <text x="340" y="78" font-family="Onest,sans-serif" font-size="6.5" fill="#FFA033" opacity="0.5" text-anchor="middle">AP2</text>
+            <circle cx="200" cy="290" r="6" fill="#FFA033" opacity="0.4"/>
+            <path d="M188 278 Q200 264 212 278" stroke="#FFA033" stroke-width="1.2" fill="none" opacity="0.2"/>
+            <text x="200" y="308" font-family="Onest,sans-serif" font-size="6.5" fill="#FFA033" opacity="0.5" text-anchor="middle">AP3</text>
+            <!-- BLE reference path (blue) -->
+            <path d="M80 240 L130 190 L180 160 L230 140 L280 120 L330 100" stroke="#5B6ECC" stroke-width="2.5" fill="none" opacity="0.5"/>
+            <circle cx="80" cy="240" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <circle cx="130" cy="190" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <circle cx="180" cy="160" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <circle cx="230" cy="140" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <circle cx="280" cy="120" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <circle cx="330" cy="100" r="3.5" fill="#5B6ECC" opacity="0.5"/>
+            <!-- CSI predicted path (orange, offset) -->
+            <path d="M84 244 L136 194 L184 156 L226 136 L274 116 L326 96" stroke="#FFA033" stroke-width="2.5" fill="none" opacity="0.5" stroke-dasharray="6 3"/>
+            <circle cx="84" cy="244" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <circle cx="136" cy="194" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <circle cx="184" cy="156" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <circle cx="226" cy="136" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <circle cx="274" cy="116" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <circle cx="326" cy="96" r="3.5" fill="#FFA033" opacity="0.5"/>
+            <!-- Error distance markers -->
+            <line x1="130" y1="190" x2="136" y2="194" stroke="#0F142F" stroke-width="0.8" opacity="0.3" stroke-dasharray="2 2"/>
+            <line x1="230" y1="140" x2="226" y2="136" stroke="#0F142F" stroke-width="0.8" opacity="0.3" stroke-dasharray="2 2"/>
+            <line x1="280" y1="120" x2="274" y2="116" stroke="#0F142F" stroke-width="0.8" opacity="0.3" stroke-dasharray="2 2"/>
+            <!-- Legend -->
+            <line x1="60" y1="328" x2="82" y2="328" stroke="#5B6ECC" stroke-width="2.5"/>
+            <text x="88" y="331" font-family="Onest,sans-serif" font-size="7.5" font-weight="600" fill="#5B6ECC">BLE ground truth</text>
+            <line x1="200" y1="328" x2="222" y2="328" stroke="#FFA033" stroke-width="2.5" stroke-dasharray="6 3"/>
+            <text x="228" y="331" font-family="Onest,sans-serif" font-size="7.5" font-weight="600" fill="#FFA033">CSI predicted</text>
+            <!-- Accuracy badge -->
+            <rect x="140" y="200" width="120" height="28" rx="8" fill="rgba(91,110,204,0.06)" stroke="rgba(91,110,204,0.1)" stroke-width="0.5"/>
+            <text x="200" y="218" font-family="monospace" font-size="8" fill="#5B6ECC" text-anchor="middle">avg error: ~1.2m</text>
+          </svg>
+        </div>
+        <!-- Controls: dots left, arrows right -->
+        <div class="about-controls">
+          <div class="about-dots" id="aboutDots">
+            <button class="about-dot active" data-slide="0"></button>
+            <button class="about-dot" data-slide="1"></button>
+            <button class="about-dot" data-slide="2"></button>
+          </div>
+          <div class="about-arrows">
+            <button class="about-arrow" id="aboutPrev">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="about-arrow" id="aboutNext">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works" id="how-it-works">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">How It Works</span>
+      <h2>Complete quests, contribute data</h2>
+    </div>
+    <div class="process fade-in">
+      <div class="process-step">
+        <div class="process-num">1</div>
+        <div class="process-icon download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <div class="process-text">
+          <h3>Download &amp; Register</h3>
+          <p>Get the app, create an account and grant permissions for Bluetooth, location, and camera.</p>
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">2</div>
+        <div class="process-icon quest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="process-text">
+          <h3>Pick a Quest</h3>
+          <p>Browse available quests. Each one guides you through waypoints, QR scans, and beacon discovery.</p>
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">3</div>
+        <div class="process-icon collect">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 19.07a10 10 0 010-14.14"/></svg>
+        </div>
+        <div class="process-text">
+          <h3>Collect Data</h3>
+          <p>Your phone silently records BLE packets - signal strength, timestamps, and device identifiers.</p>
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">4</div>
+        <div class="process-icon upload">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="process-text">
+          <h3>Submit &amp; Done</h3>
+          <p>Data is securely uploaded and becomes part of the indoor positioning research dataset.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA SECTION -->
+<section class="data-section" id="data">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Collected Data</span>
+      <h2>What the app records</h2>
+      <p class="lead">Transparency matters. Here is exactly what Monad Scan collects during each quest session. No personal data beyond your account credentials is ever stored.</p>
+    </div>
+    <div class="data-layout">
+      <div class="data-phone fade-in">
+        <svg viewBox="0 0 560 460" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Beacon top-left -->
+          <circle cx="60" cy="140" r="22" stroke="#5B6ECC" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="60" cy="140" r="40" stroke="#5B6ECC" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="60" cy="140" r="58" stroke="#5B6ECC" stroke-width="0.3" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="60" cy="140" r="8" fill="#5B6ECC"/><circle cx="60" cy="140" r="3.5" fill="#0F142F"/>
+          <text x="60" y="118" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.7">MONAD1</text>
+
+          <!-- Beacon bottom-left -->
+          <circle cx="50" cy="340" r="22" stroke="#FFA033" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="50" cy="340" r="40" stroke="#FFA033" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="50" cy="340" r="58" stroke="#FFA033" stroke-width="0.3" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="50" cy="340" r="8" fill="#FFA033"/><circle cx="50" cy="340" r="3.5" fill="#0F142F"/>
+          <text x="50" y="386" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.7">MONAD5</text>
+
+          <!-- Beacon top-right -->
+          <circle cx="500" cy="120" r="22" stroke="#FFA033" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="500" cy="120" r="40" stroke="#FFA033" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="500" cy="120" r="58" stroke="#FFA033" stroke-width="0.3" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="500" cy="120" r="8" fill="#FFA033"/><circle cx="500" cy="120" r="3.5" fill="#0F142F"/>
+          <text x="500" y="98" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#FFA033" text-anchor="middle" opacity="0.7">MONAD3</text>
+
+          <!-- Beacon bottom-right -->
+          <circle cx="510" cy="360" r="22" stroke="#5B6ECC" stroke-width="0.8" fill="none" class="hero-signal hero-signal-d1"/>
+          <circle cx="510" cy="360" r="40" stroke="#5B6ECC" stroke-width="0.5" fill="none" class="hero-signal hero-signal-d2"/>
+          <circle cx="510" cy="360" r="58" stroke="#5B6ECC" stroke-width="0.3" fill="none" class="hero-signal hero-signal-d3"/>
+          <circle cx="510" cy="360" r="8" fill="#5B6ECC"/><circle cx="510" cy="360" r="3.5" fill="#0F142F"/>
+          <text x="510" y="406" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="#5B6ECC" text-anchor="middle" opacity="0.7">MONAD2</text>
+
+          <!-- Data flow lines -->
+          <line x1="60" y1="140" x2="180" y2="185" stroke="#5B6ECC" stroke-width="1" stroke-dasharray="3 4" opacity="0.3" class="tri-line"/>
+          <line x1="50" y1="340" x2="180" y2="320" stroke="#FFA033" stroke-width="1" stroke-dasharray="3 4" opacity="0.3" class="tri-line"/>
+          <line x1="500" y1="120" x2="380" y2="175" stroke="#FFA033" stroke-width="1" stroke-dasharray="3 4" opacity="0.3" class="tri-line"/>
+          <line x1="510" y1="360" x2="380" y2="335" stroke="#5B6ECC" stroke-width="1" stroke-dasharray="3 4" opacity="0.3" class="tri-line"/>
+
+          <!-- Animated data packets -->
+          <circle r="3" fill="#5B6ECC" opacity="0.8"><animateMotion dur="2.5s" repeatCount="indefinite" path="M60,140 L180,185"/></circle>
+          <circle r="3" fill="#FFA033" opacity="0.8"><animateMotion dur="2s" repeatCount="indefinite" path="M50,340 L180,320"/></circle>
+          <circle r="3" fill="#FFA033" opacity="0.7"><animateMotion dur="2.8s" repeatCount="indefinite" path="M500,120 L380,175"/></circle>
+          <circle r="3" fill="#5B6ECC" opacity="0.7"><animateMotion dur="3s" repeatCount="indefinite" path="M510,360 L380,335"/></circle>
+
+          <!-- Floating data labels -->
+          <g opacity="0.5">
+            <rect x="88" y="148" width="52" height="16" rx="4" fill="rgba(91,110,204,0.2)"/>
+            <text x="114" y="159" font-family="monospace" font-size="6" fill="#5B6ECC" text-anchor="middle">-42 dBm</text>
+          </g>
+          <g opacity="0.5">
+            <rect x="418" y="134" width="46" height="16" rx="4" fill="rgba(255,160,51,0.2)"/>
+            <text x="441" y="145" font-family="monospace" font-size="6" fill="#FFA033" text-anchor="middle">RSSI</text>
+          </g>
+          <g opacity="0.4">
+            <rect x="82" y="324" width="56" height="16" rx="4" fill="rgba(255,160,51,0.2)"/>
+            <text x="110" y="335" font-family="monospace" font-size="6" fill="#FFA033" text-anchor="middle">UUIDs</text>
+          </g>
+          <g opacity="0.4">
+            <rect x="398" y="348" width="66" height="16" rx="4" fill="rgba(91,110,204,0.2)"/>
+            <text x="431" y="359" font-family="monospace" font-size="6" fill="#5B6ECC" text-anchor="middle">timestamp</text>
+          </g>
+
+          <!-- Phone body -->
+          <rect x="180" y="60" width="200" height="380" rx="28" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+          <!-- Screen -->
+          <rect x="190" y="84" width="180" height="332" rx="6" fill="rgba(255,255,255,0.04)"/>
+          <!-- Notch -->
+          <rect x="250" y="66" width="60" height="7" rx="3.5" fill="rgba(255,255,255,0.1)"/>
+
+          <!-- ===== Quest screen UI ===== -->
+          <!-- App header -->
+          <rect x="190" y="84" width="180" height="26" rx="6" fill="rgba(91,110,204,0.15)"/>
+          <text x="199" y="101" font-family="Onest,sans-serif" font-size="10" fill="white" opacity="0.5">&#x2190;</text>
+          <text x="280" y="101" font-family="Onest,sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="middle">Library Level 2</text>
+
+          <!-- Mini floor plan -->
+          <rect x="198" y="118" width="164" height="154" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+          <!-- Grid -->
+          <line x1="198" y1="160" x2="362" y2="160" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+          <line x1="198" y1="200" x2="362" y2="200" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+          <line x1="198" y1="240" x2="362" y2="240" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+          <line x1="250" y1="118" x2="250" y2="272" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+          <line x1="310" y1="118" x2="310" y2="272" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+          <!-- Mini shelves -->
+          <rect x="206" y="126" width="28" height="4" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+          <rect x="206" y="133" width="28" height="4" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+          <rect x="326" y="126" width="28" height="4" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+          <rect x="326" y="133" width="28" height="4" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+          <!-- Mini table -->
+          <rect x="255" y="178" width="50" height="22" rx="4" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+          <!-- Waypoints -->
+          <circle cx="220" cy="148" r="5" fill="rgba(91,110,204,0.3)" stroke="#5B6ECC" stroke-width="0.8"/>
+          <text x="220" y="150" font-family="Onest,sans-serif" font-size="5.5" fill="white" text-anchor="middle" font-weight="600">1</text>
+          <circle cx="340" cy="158" r="5" fill="rgba(91,110,204,0.3)" stroke="#5B6ECC" stroke-width="0.8"/>
+          <text x="340" y="160" font-family="Onest,sans-serif" font-size="5.5" fill="white" text-anchor="middle" font-weight="600">2</text>
+          <circle cx="300" cy="215" r="5" fill="rgba(255,160,51,0.3)" stroke="#FFA033" stroke-width="0.8"/>
+          <text x="300" y="217" font-family="Onest,sans-serif" font-size="5.5" fill="white" text-anchor="middle" font-weight="600">3</text>
+          <circle cx="230" cy="245" r="5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+          <text x="230" y="247" font-family="Onest,sans-serif" font-size="5.5" fill="white" opacity="0.4" text-anchor="middle" font-weight="600">4</text>
+          <circle cx="345" cy="255" r="5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+          <text x="345" y="257" font-family="Onest,sans-serif" font-size="5.5" fill="white" opacity="0.4" text-anchor="middle" font-weight="600">5</text>
+          <!-- Path between completed waypoints -->
+          <path d="M220 148 L340 158 L300 215" stroke="#5B6ECC" stroke-width="1.5" stroke-dasharray="4 3" fill="none" opacity="0.5"/>
+          <!-- User position -->
+          <circle cx="300" cy="215" r="9" fill="#FFA033" opacity="0.12"/>
+          <circle cx="300" cy="215" r="4" fill="#FFA033"/>
+
+          <!-- Step instruction -->
+          <rect x="198" y="280" width="164" height="40" rx="8" fill="rgba(255,160,51,0.1)" stroke="rgba(255,160,51,0.15)" stroke-width="0.5"/>
+          <text x="280" y="297" font-family="Onest,sans-serif" font-size="8" font-weight="600" fill="white" text-anchor="middle" opacity="0.85">Scan QR at point B3</text>
+          <text x="280" y="311" font-family="Onest,sans-serif" font-size="7" fill="#FFA033" text-anchor="middle" opacity="0.6">Step 3 of 5</text>
+
+          <!-- Progress bar -->
+          <rect x="198" y="328" width="164" height="5" rx="2.5" fill="rgba(255,255,255,0.08)"/>
+          <rect x="198" y="328" width="98" height="5" rx="2.5" fill="#5B6ECC" opacity="0.7"/>
+
+          <!-- Scan button -->
+          <rect x="220" y="342" width="120" height="34" rx="17" fill="#FFA033"/>
+          <text x="280" y="363" font-family="Onest,sans-serif" font-size="10" font-weight="700" fill="#0F142F" text-anchor="middle">Scan QR</text>
+
+          <!-- Collecting status -->
+          <circle cx="208" cy="390" r="3" fill="#28CA41"/>
+          <text x="216" y="393" font-family="Onest,sans-serif" font-size="6.5" fill="white" opacity="0.4">Collecting BLE data...</text>
+
+          <!-- Home indicator -->
+          <rect x="255" y="424" width="50" height="3" rx="1.5" fill="rgba(255,255,255,0.12)"/>
+        </svg>
+      </div>
+      <div class="data-grid">
+        <div class="data-card fade-in">
+          <div class="data-icon ble">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/></svg>
+          </div>
+          <h3>BLE Advertisements</h3>
+          <p>Device MAC address, device name, manufacturer data, company ID, and advertised service UUIDs from each beacon packet received.</p>
+        </div>
+        <div class="data-card fade-in">
+          <div class="data-icon signal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
+          </div>
+          <h3>Signal Strength (RSSI)</h3>
+          <p>Received Signal Strength Indicator measured in dBm for every packet. The key metric for triangulation and distance estimation.</p>
+        </div>
+        <div class="data-card fade-in">
+          <div class="data-icon meta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <h3>Timestamps &amp; Metadata</h3>
+          <p>Millisecond-precision timestamps for each packet, quest and enrollment IDs, session duration, platform info, and app version.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNOLOGY -->
+<section class="tech" id="technology">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">The Research</span>
+      <h2>Technology behind the experiment</h2>
+      <p class="lead">Combining BLE beacon infrastructure with WiFi Channel State Information analysis to push the boundaries of indoor positioning.</p>
+    </div>
+    <div class="tech-grid fade-in">
+      <div class="tech-card">
+        <div class="tech-card-header">
+          <div class="tech-icon triangulation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 19.07a10 10 0 010-14.14"/></svg>
+          </div>
+          <h3>BLE Triangulation</h3>
+        </div>
+        <p>Measuring <strong>RSSI values</strong> from multiple beacons to estimate position using <strong>trilateration</strong> and path loss models.</p>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header">
+          <div class="tech-icon wifi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+          </div>
+          <h3>WiFi CSI Analysis</h3>
+        </div>
+        <p><strong>Channel State Information</strong> captures WiFi signal propagation. BLE positions serve as <strong>ground truth</strong> for CSI-based models.</p>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header">
+          <div class="tech-icon qr">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><path d="M21 14h-3v3"/><path d="M21 21v-3h-3"/></svg>
+          </div>
+          <h3>QR Reference Points</h3>
+        </div>
+        <p>QR codes at <strong>known positions</strong> act as ground truth checkpoints, creating verified data for <strong>calibrating algorithms</strong>.</p>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header">
+          <div class="tech-icon dataset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+          </div>
+          <h3>Dataset Generation</h3>
+        </div>
+        <p>BLE packets, timestamps, and verified positions exported as <strong>structured TSV files</strong> for reproducible experiments.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="participate">
+  <div class="container">
+    <div class="cta-box fade-in">
+      <h2>Help advance indoor positioning research</h2>
+      <p>Visit the <strong>FIIT STU library</strong> in Bratislava, open the Monad Scan app, and complete a quest. Each session takes just <strong>a few minutes</strong> and directly contributes to the research dataset.</p>
+      <a href="mailto:xvanco@stuba.sk" class="btn btn-accent-cta">Contact the Researcher</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      <svg viewBox="0 0 91 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:18px">
+        <path d="M1.697,22.5V6.477H5.997L10.274,14.217L14.506,6.477H18.648V22.5H15.412V10.8L10.863,18.924H9.55L4.934,10.8V22.5H1.697ZM26.487,22.658C25.28,22.658 24.224,22.417 23.319,21.934C22.414,21.436 21.712,20.735 21.214,19.83C20.717,18.909 20.468,17.823 20.468,16.571C20.468,15.288 20.717,14.187 21.214,13.267C21.727,12.331 22.437,11.615 23.342,11.117C24.247,10.619 25.288,10.37 26.465,10.37C27.672,10.37 28.72,10.626 29.611,11.139C30.501,11.652 31.195,12.369 31.692,13.289C32.19,14.21 32.439,15.311 32.439,16.593C32.439,17.846 32.19,18.932 31.692,19.852C31.21,20.757 30.523,21.451 29.633,21.934C28.758,22.417 27.709,22.658 26.487,22.658ZM26.442,19.762C27.136,19.762 27.694,19.611 28.117,19.309C28.539,19.007 28.841,18.615 29.022,18.132C29.218,17.634 29.316,17.114 29.316,16.571C29.316,16.028 29.218,15.507 29.022,15.009C28.841,14.511 28.539,14.104 28.117,13.787C27.709,13.455 27.151,13.289 26.442,13.289C25.763,13.289 25.212,13.455 24.79,13.787C24.368,14.104 24.058,14.511 23.862,15.009C23.681,15.507 23.591,16.028 23.591,16.571C23.591,17.129 23.681,17.649 23.862,18.132C24.058,18.615 24.368,19.007 24.79,19.309C25.212,19.611 25.763,19.762 26.442,19.762ZM33.789,22.5V10.574H36.754L36.912,11.954C37.244,11.547 37.621,11.23 38.043,11.004C38.481,10.762 38.918,10.596 39.356,10.506C39.809,10.415 40.216,10.37 40.578,10.37C41.725,10.37 42.615,10.619 43.249,11.117C43.897,11.615 44.357,12.286 44.629,13.131C44.916,13.961 45.059,14.889 45.059,15.914V22.5H41.891V16.322C41.891,15.96 41.861,15.598 41.8,15.236C41.74,14.873 41.627,14.542 41.461,14.24C41.31,13.938 41.091,13.697 40.804,13.516C40.518,13.335 40.141,13.244 39.673,13.244C39.069,13.244 38.564,13.395 38.157,13.697C37.749,13.998 37.447,14.406 37.251,14.919C37.055,15.432 36.957,15.997 36.957,16.616V22.5H33.789ZM50.591,22.658C50.048,22.658 49.52,22.59 49.007,22.455C48.509,22.304 48.064,22.078 47.672,21.776C47.28,21.474 46.971,21.097 46.744,20.644C46.518,20.192 46.405,19.664 46.405,19.06C46.405,18.245 46.571,17.597 46.903,17.114C47.235,16.616 47.68,16.239 48.238,15.982C48.796,15.726 49.437,15.552 50.161,15.462C50.901,15.371 51.663,15.326 52.447,15.326H54.167C54.167,14.889 54.084,14.504 53.918,14.172C53.767,13.825 53.534,13.561 53.217,13.38C52.9,13.184 52.493,13.086 51.995,13.086C51.678,13.086 51.368,13.131 51.067,13.221C50.78,13.297 50.539,13.41 50.343,13.561C50.146,13.712 50.018,13.908 49.958,14.149H46.744C46.835,13.485 47.046,12.92 47.378,12.452C47.71,11.969 48.125,11.577 48.623,11.275C49.12,10.973 49.664,10.755 50.252,10.619C50.855,10.468 51.474,10.392 52.108,10.392C53.843,10.392 55.125,10.89 55.955,11.886C56.785,12.867 57.2,14.262 57.2,16.073V22.5H54.348L54.303,20.961C53.926,21.489 53.496,21.874 53.013,22.115C52.545,22.357 52.093,22.507 51.655,22.568C51.218,22.628 50.863,22.658 50.591,22.658ZM51.316,20.146C51.844,20.146 52.326,20.041 52.764,19.83C53.202,19.618 53.549,19.332 53.805,18.97C54.062,18.608 54.19,18.2 54.19,17.747V17.453H52.017C51.7,17.453 51.391,17.468 51.089,17.499C50.803,17.529 50.539,17.589 50.297,17.68C50.071,17.755 49.89,17.883 49.754,18.064C49.618,18.245 49.55,18.487 49.55,18.788C49.55,19.09 49.626,19.347 49.777,19.558C49.943,19.754 50.161,19.905 50.433,20.011C50.705,20.101 50.999,20.146 51.316,20.146ZM63.907,22.658C62.7,22.658 61.696,22.387 60.897,21.844C60.112,21.285 59.524,20.546 59.132,19.626C58.739,18.691 58.543,17.657 58.543,16.525C58.543,15.334 58.754,14.278 59.177,13.357C59.599,12.422 60.225,11.69 61.055,11.162C61.885,10.634 62.918,10.37 64.156,10.37C64.578,10.37 64.993,10.423 65.4,10.528C65.823,10.619 66.207,10.762 66.554,10.958C66.916,11.139 67.226,11.381 67.482,11.682V6.477H70.65V22.5H67.573L67.527,21.165C67.256,21.512 66.924,21.798 66.532,22.025C66.155,22.236 65.747,22.394 65.31,22.5C64.872,22.606 64.404,22.658 63.907,22.658ZM64.54,19.807C65.219,19.807 65.77,19.649 66.192,19.332C66.63,19.015 66.954,18.608 67.165,18.11C67.377,17.612 67.482,17.076 67.482,16.503C67.482,15.914 67.377,15.379 67.165,14.896C66.969,14.398 66.652,14.006 66.215,13.719C65.793,13.417 65.234,13.267 64.54,13.267C63.846,13.267 63.288,13.425 62.866,13.742C62.443,14.059 62.141,14.474 61.96,14.987C61.794,15.484 61.711,16.02 61.711,16.593C61.711,17.016 61.757,17.423 61.847,17.815C61.953,18.193 62.119,18.532 62.345,18.834C62.571,19.136 62.866,19.377 63.228,19.558C63.59,19.724 64.027,19.807 64.54,19.807Z" fill="#0F142F"/>
+        <path d="M75.322,22.772C74.84,22.772 74.425,22.613 74.078,22.296C73.746,21.979 73.58,21.549 73.58,21.006C73.58,20.463 73.753,20.033 74.1,19.716C74.447,19.385 74.862,19.219 75.345,19.219C75.828,19.219 76.235,19.385 76.567,19.716C76.899,20.033 77.065,20.463 77.065,21.006C77.065,21.549 76.899,21.979 76.567,22.296C76.235,22.613 75.82,22.772 75.322,22.772Z" fill="#5B6ECC"/>
+        <path d="M80.731,21.608C80.731,18.243 78.003,15.515 74.638,15.515" stroke="#0F142F" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+        <path d="M84.648,21.172C84.648,15.884 80.361,11.598 75.073,11.598" stroke="#0F142F" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+        <path d="M89,21.608C89,13.916 82.765,7.681 75.073,7.681" stroke="#0F142F" stroke-width="2.394" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="footer-copy">&copy; 2025 Martin Vanco. FIIT STU Bratislava.</span>
+    </div>
+    <div class="footer-links">
+      <a href="/terms">Terms &amp; Conditions</a>
+      <a href="/privacy-policy">Privacy Policy</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 10); });
+  const toggle = document.getElementById('mobileToggle');
+  const links = document.getElementById('navLinks');
+  toggle.addEventListener('click', () => { links.classList.toggle('open'); toggle.classList.toggle('active'); });
+  links.querySelectorAll('a').forEach(a => { a.addEventListener('click', () => { links.classList.remove('open'); toggle.classList.remove('active'); }); });
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+  // About section slide controller
+  const slides = document.querySelectorAll('.about-slide');
+  const dots = document.querySelectorAll('.about-dot');
+  let currentSlide = 0;
+  let autoTimer = null;
+
+  function goToSlide(i) {
+    slides.forEach(s => s.classList.remove('active'));
+    dots.forEach(d => d.classList.remove('active'));
+    slides[i].classList.add('active');
+    dots[i].classList.add('active');
+    currentSlide = i;
+  }
+
+  function startAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(() => goToSlide((currentSlide + 1) % slides.length), 6000);
+  }
+
+  dots.forEach(d => {
+    d.addEventListener('click', () => { goToSlide(parseInt(d.dataset.slide)); startAuto(); });
+  });
+  document.getElementById('aboutPrev').addEventListener('click', () => {
+    goToSlide((currentSlide - 1 + slides.length) % slides.length); startAuto();
+  });
+  document.getElementById('aboutNext').addEventListener('click', () => {
+    goToSlide((currentSlide + 1) % slides.length); startAuto();
+  });
+
+  startAuto();
+</script>
+
+</body>
+</html>

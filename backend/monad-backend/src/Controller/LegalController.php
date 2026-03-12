@@ -8,6 +8,14 @@ use Symfony\Component\Routing\Annotation\Route;
 
 class LegalController extends AbstractController
 {
+    #[Route('/', name: 'index', methods: ['GET'])]
+    public function index(): Response
+    {
+        $html = file_get_contents(__DIR__ . '/../../public/index.html');
+
+        return new Response($html, 200, ['Content-Type' => 'text/html']);
+    }
+
     #[Route('/terms', name: 'terms', methods: ['GET'])]
     public function terms(): Response
     {

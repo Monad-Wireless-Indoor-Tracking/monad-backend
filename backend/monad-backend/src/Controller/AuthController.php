@@ -190,6 +190,43 @@ class AuthController extends AbstractController
         ]);
     }
 
+    #[Route('/api/auth/account', name: 'api_delete_account', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/auth/account',
+        summary: 'Delete current user account (soft delete)',
+        description: 'Soft-deletes the authenticated user account by anonymizing personal data and marking it as deleted',
+        security: [['Bearer' => []]],
+        tags: ['User']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Account successfully deleted',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'message', type: 'string', example: 'Account deleted successfully')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Unauthorized - missing or invalid token'
+    )]
+    public function deleteAccount(EntityManagerInterface $entityManager): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
+        }
+
+        $user->softDelete();
+        $entityManager->flush();
+
+        return $this->json([
+            'message' => 'Account deleted successfully'
+        ]);
+    }
+
     #[Route('/api/auth/me', name: 'api_me', methods: ['GET'])]
     #[OA\Get(
         path: '/api/auth/me',
