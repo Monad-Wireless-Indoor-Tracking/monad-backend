@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#FFFFFF">
-  <title>Monad Scan - Indoor Positioning Research at FIIT STU</title>
-  <meta name="description" content="Monad Scan is a mobile research app collecting BLE beacon data through interactive quests at the FIIT STU library in Bratislava. Contributing to indoor positioning and WiFi channel state analysis research.">
-  <meta name="keywords" content="BLE, Bluetooth Low Energy, indoor positioning, FIIT STU, Bratislava, research, beacons, triangulation, CSI, channel state information, diploma thesis">
-  <meta property="og:title" content="Monad Scan - Indoor Positioning Research">
-  <meta property="og:description" content="Help advance indoor positioning research by collecting BLE beacon data through interactive quests at FIIT STU Bratislava.">
+  <title>Monad - CSI-Based Movement Detection &amp; Crowd Modeling Research</title>
+  <meta name="description" content="Monad is a research platform using WiFi Channel State Information (CSI) and BLE to detect human movement and model crowd dynamics in indoor environments at FIIT STU Bratislava.">
+  <meta name="keywords" content="CSI, channel state information, crowd modeling, movement detection, WiFi, BLE, indoor positioning, fluid dynamics, FIIT STU, Bratislava, diploma thesis, wireless sensing">
+  <meta property="og:title" content="Monad - CSI-Based Movement Detection &amp; Crowd Modeling">
+  <meta property="og:description" content="Research platform using WiFi CSI and BLE infrastructure to detect movement and model crowd dynamics as fluid flow in indoor environments.">
   <meta property="og:image" content="http://monad.martinvanco.sk/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -478,10 +478,11 @@
   </a>
   <div class="nav-links" id="navLinks">
     <a href="#about">About</a>
-    <a href="#how-it-works">How It Works</a>
+    <a href="#how-it-works">Infrastructure</a>
     <a href="#data">Data</a>
-    <a href="#technology">Technology</a>
+    <a href="#technology">Research</a>
     <a href="#participate">Participate</a>
+    <a href="https://github.com/Monad-Wireless-Indoor-Tracking" target="_blank" rel="noopener">GitHub</a>
   </div>
   <button class="mobile-toggle" id="mobileToggle" aria-label="Menu">
     <span></span><span></span><span></span>
@@ -502,9 +503,9 @@
   </div>
   <div class="container">
     <div class="hero-content">
-      <div class="hero-badge hero-fade" style="animation-delay:0.1s"><span class="dot"></span> Research Experiment</div>
-      <h1 class="hero-fade" style="animation-delay:0.25s">Mapping indoor spaces with <span class="accent-text">Bluetooth</span> signals</h1>
-      <p class="hero-desc hero-fade" style="animation-delay:0.4s">Monad Scan is a mobile research app that collects BLE beacon data through interactive quests. Help us build precise indoor positioning datasets at the FIIT STU library in Bratislava.</p>
+      <div class="hero-badge hero-fade" style="animation-delay:0.1s"><span class="dot"></span> Master's Thesis Research</div>
+      <h1 class="hero-fade" style="animation-delay:0.25s">Detecting movement with <span class="accent-text">wireless</span> signals</h1>
+      <p class="hero-desc hero-fade" style="animation-delay:0.4s">Monad uses WiFi Channel State Information and BLE infrastructure to detect human movement and model crowd dynamics in indoor environments. Exploring how people flowing through spaces create measurable disturbances in wireless signals.</p>
       <div class="hero-actions hero-fade" style="animation-delay:0.55s">
         <a href="#" class="store-badge"><img src="/app-store-badge.svg" alt="Download on the App Store" height="44"></a>
         <a href="#" class="store-badge"><img src="/google-play-badge.svg" alt="Get it on Google Play" height="44"></a>
@@ -585,11 +586,11 @@
 <section class="about" id="about">
   <div class="container">
     <div class="fade-in">
-      <span class="section-label">About the Experiment</span>
-      <h2>Indoor positioning research powered by you</h2>
-      <p>Monad Scan is part of a <strong>Master's thesis research project</strong> at the Faculty of Informatics and Information Technologies (FIIT), Slovak University of Technology in Bratislava. The goal is to build a <strong>high-quality reference dataset</strong> for indoor positioning systems.</p>
-      <p>We have deployed <strong>BLE beacons</strong> throughout the student library at FIIT. When participants complete quests in the app, their devices passively collect <strong>Bluetooth advertisement packets</strong> from these beacons. This data enables precise location estimation through triangulation and serves as ground truth for advanced <strong>WiFi Channel State Information (CSI)</strong> analysis.</p>
-      <p>The collected dataset will help validate and improve <strong>indoor positioning techniques</strong> that could one day navigate people through airports, hospitals, shopping centers, and other complex indoor environments - <strong>without GPS</strong>.</p>
+      <span class="section-label">About the Research</span>
+      <h2>CSI-based movement detection and crowd modeling</h2>
+      <p>Monad is a <strong>Master's thesis research project</strong> at the Faculty of Informatics and Information Technologies (FIIT), Slovak University of Technology in Bratislava. The goal is to use <strong>Channel State Information (CSI)</strong> measurements from deployed WiFi/BLE infrastructure to detect and model human movement in indoor environments.</p>
+      <p>We have deployed a <strong>heterogeneous wireless infrastructure</strong> throughout the FIIT library - including BLE beacons, BLE collectors, network communicators, and dedicated CSI monitors operating in AP/monitor mode. A <strong>2D GIS-mapped monitored area</strong> with multiple device types captures how people moving through spaces create measurable disturbances in wireless signals.</p>
+      <p>The core hypothesis is that crowd movement patterns observed through <strong>CSI perturbations</strong> can be modeled using <strong>fluid dynamics analogies</strong> - treating crowd flow as a continuum where WiFi signal amplitude and phase changes map to flow properties like velocity and density.</p>
     </div>
     <div class="fade-in">
       <div class="about-illustration">
@@ -746,48 +747,48 @@
 <section class="how-it-works" id="how-it-works">
   <div class="container">
     <div class="fade-in">
-      <span class="section-label">How It Works</span>
-      <h2>Complete quests, contribute data</h2>
+      <span class="section-label">Infrastructure</span>
+      <h2>Heterogeneous wireless sensing platform</h2>
     </div>
     <div class="process fade-in">
       <div class="process-step">
         <div class="process-num">1</div>
         <div class="process-icon download">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/></svg>
         </div>
         <div class="process-text">
-          <h3>Download &amp; Register</h3>
-          <p>Get the app, create an account and grant permissions for Bluetooth, location, and camera.</p>
+          <h3>Deploy Devices</h3>
+          <p>BLE beacons, collectors, CSI monitors, and network communicators are placed across the GIS-mapped monitored area.</p>
         </div>
       </div>
       <div class="process-step">
         <div class="process-num">2</div>
         <div class="process-icon quest">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
         </div>
         <div class="process-text">
-          <h3>Pick a Quest</h3>
-          <p>Browse available quests. Each one guides you through waypoints, QR scans, and beacon discovery.</p>
+          <h3>Extract CSI</h3>
+          <p>Dedicated monitors in AP/monitor mode passively capture WiFi Channel State Information - amplitude and phase across subcarriers.</p>
         </div>
       </div>
       <div class="process-step">
         <div class="process-num">3</div>
         <div class="process-icon collect">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 19.07a10 10 0 010-14.14"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v-2"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
         <div class="process-text">
-          <h3>Collect Data</h3>
-          <p>Your phone silently records BLE packets - signal strength, timestamps, and device identifiers.</p>
+          <h3>Detect Movement</h3>
+          <p>CSI perturbations caused by human movement are captured alongside BLE RSSI from the mobile app for complementary sensing.</p>
         </div>
       </div>
       <div class="process-step">
         <div class="process-num">4</div>
         <div class="process-icon upload">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
         </div>
         <div class="process-text">
-          <h3>Submit &amp; Done</h3>
-          <p>Data is securely uploaded and becomes part of the indoor positioning research dataset.</p>
+          <h3>Model Crowd Flow</h3>
+          <p>Signal data feeds into fluid dynamics-inspired models to estimate crowd density, flow direction, and movement patterns.</p>
         </div>
       </div>
     </div>
@@ -799,8 +800,8 @@
   <div class="container">
     <div class="fade-in">
       <span class="section-label">Collected Data</span>
-      <h2>What the app records</h2>
-      <p class="lead">Transparency matters. Here is exactly what Monad Scan collects during each quest session. No personal data beyond your account credentials is ever stored.</p>
+      <h2>What the platform captures</h2>
+      <p class="lead">The sensing platform passively collects wireless signal data from multiple device types. No personal data is captured - only RF signal characteristics from the environment.</p>
     </div>
     <div class="data-layout">
       <div class="data-phone fade-in">
@@ -934,22 +935,22 @@
           <div class="data-icon ble">
             <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/></svg>
           </div>
-          <h3>BLE Advertisements</h3>
-          <p>Device MAC address, device name, manufacturer data, company ID, and advertised service UUIDs from each beacon packet received.</p>
+          <h3>WiFi CSI Data</h3>
+          <p>Channel State Information including amplitude and phase values across subcarriers, capturing how human movement perturbs the wireless signal propagation.</p>
         </div>
         <div class="data-card fade-in">
           <div class="data-icon signal">
             <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
           </div>
-          <h3>Signal Strength (RSSI)</h3>
-          <p>Received Signal Strength Indicator measured in dBm for every packet. The key metric for triangulation and distance estimation.</p>
+          <h3>BLE RSSI &amp; Advertisements</h3>
+          <p>Bluetooth signal strength, device identifiers, and advertisement packets from deployed beacons - complementing CSI for movement detection and positioning.</p>
         </div>
         <div class="data-card fade-in">
           <div class="data-icon meta">
             <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
-          <h3>Timestamps &amp; Metadata</h3>
-          <p>Millisecond-precision timestamps for each packet, quest and enrollment IDs, session duration, platform info, and app version.</p>
+          <h3>Timestamps &amp; Spatial Context</h3>
+          <p>Millisecond-precision timestamps, GIS-mapped device positions, session metadata, and spatial context linking CSI measurements to physical locations.</p>
         </div>
       </div>
     </div>
@@ -961,45 +962,45 @@
   <div class="container">
     <div class="fade-in">
       <span class="section-label">The Research</span>
-      <h2>Technology behind the experiment</h2>
-      <p class="lead">Combining BLE beacon infrastructure with WiFi Channel State Information analysis to push the boundaries of indoor positioning.</p>
+      <h2>From wireless signals to crowd dynamics</h2>
+      <p class="lead">Combining CSI-based movement detection with fluid dynamics modeling to understand how crowds behave in indoor spaces.</p>
     </div>
     <div class="tech-grid fade-in">
       <div class="tech-card">
         <div class="tech-card-header">
           <div class="tech-icon triangulation">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 19.07a10 10 0 010-14.14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
           </div>
-          <h3>BLE Triangulation</h3>
+          <h3>CSI Movement Detection</h3>
         </div>
-        <p>Measuring <strong>RSSI values</strong> from multiple beacons to estimate position using <strong>trilateration</strong> and path loss models.</p>
+        <p><strong>Channel State Information</strong> from WiFi captures signal amplitude and phase changes caused by human movement - enabling <strong>passive, device-free sensing</strong>.</p>
       </div>
       <div class="tech-card">
         <div class="tech-card-header">
           <div class="tech-icon wifi">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFA033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/></svg>
           </div>
-          <h3>WiFi CSI Analysis</h3>
+          <h3>Crowd as Fluid Model</h3>
         </div>
-        <p><strong>Channel State Information</strong> captures WiFi signal propagation. BLE positions serve as <strong>ground truth</strong> for CSI-based models.</p>
+        <p>Exploring <strong>fluid dynamics analogies</strong> - treating crowd flow as a continuum where CSI perturbations map to <strong>flow velocity, density, and direction</strong>.</p>
       </div>
       <div class="tech-card">
         <div class="tech-card-header">
           <div class="tech-icon qr">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><path d="M21 14h-3v3"/><path d="M21 21v-3h-3"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0F142F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49"/><path d="M7.76 16.24a6 6 0 010-8.49"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 19.07a10 10 0 010-14.14"/></svg>
           </div>
-          <h3>QR Reference Points</h3>
+          <h3>BLE Complementary Sensing</h3>
         </div>
-        <p>QR codes at <strong>known positions</strong> act as ground truth checkpoints, creating verified data for <strong>calibrating algorithms</strong>.</p>
+        <p><strong>BLE RSSI</strong> from deployed beacons and a mobile app provides complementary data for <strong>fingerprinting and validating</strong> CSI-based detection.</p>
       </div>
       <div class="tech-card">
         <div class="tech-card-header">
           <div class="tech-icon dataset">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B6ECC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
           </div>
-          <h3>Dataset Generation</h3>
+          <h3>Monitoring Stack</h3>
         </div>
-        <p>BLE packets, timestamps, and verified positions exported as <strong>structured TSV files</strong> for reproducible experiments.</p>
+        <p>Infrastructure monitored via <strong>Consul and Grafana</strong>. CSI data, device health, and experiment metrics collected in a unified <strong>observability pipeline</strong>.</p>
       </div>
     </div>
   </div>
@@ -1009,8 +1010,8 @@
 <section class="cta-section" id="participate">
   <div class="container">
     <div class="cta-box fade-in">
-      <h2>Help advance indoor positioning research</h2>
-      <p>Visit the <strong>FIIT STU library</strong> in Bratislava, open the Monad Scan app, and complete a quest. Each session takes just <strong>a few minutes</strong> and directly contributes to the research dataset.</p>
+      <h2>Help advance wireless sensing research</h2>
+      <p>Visit the <strong>FIIT STU library</strong> in Bratislava and use the Monad Scan app to contribute BLE data. Your movement helps us validate <strong>CSI-based crowd models</strong> and push the boundaries of passive indoor sensing.</p>
       <a href="mailto:xvanco@stuba.sk" class="btn btn-accent-cta">Contact the Researcher</a>
     </div>
   </div>
