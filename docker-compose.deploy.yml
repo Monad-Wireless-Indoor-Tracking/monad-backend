@@ -1,0 +1,76 @@
+# Deployment on the project host (Hetzner CCX33), published as api.monad.dubec.dev.
+#
+# Differences from the development compose in this repo:
+#   * joins the external `monad` network, so the API sits alongside the rest of the lab's
+#     services and can be reached by name from them;
+#   * binds only to loopback — TLS termination is the host nginx that already serves
+#     monad.dubec.dev, so there is exactly one certificate and one vhost story;
+#   * no source bind-mount and no `composer install` at boot: the image is the artefact;
+#   * object storage is Hetzner, configured by S3_ENDPOINT rather than implied by region.
+#
+# The lab bundle is mounted read-only from the host so an operator can edit the rig description
+# without rebuilding or restarting anything the phones depend on.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monad_api_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monad
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      interval: 10s
+
+  api:
+    image: ${MONAD_API_IMAGE:-ghcr.io/monad-wireless-indoor-tracking/monad-backend:main}
+    container_name: monad_api
+    restart: unless-stopped
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      JWT_SECRET_KEY: /app/config/jwt/private.pem
+      JWT_PUBLIC_KEY: /app/config/jwt/public.pem
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # Router base for absolute URLs generated outside a request (console, API docs).
+      # The image carries a default; without this line the .env value would be inert.
+      DEFAULT_URI: ${DEFAULT_URI:-https://api.monad.dubec.dev}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-^https://(api\.)?monad\.dubec\.dev$$}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-1}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
+      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
+      AWS_S3_PRESIGNED_URL_EXPIRY: ${AWS_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
+    ports:
+      # Loopback only; api.monad.dubec.dev is terminated by the host nginx.
+      # NOT 8080 — Headscale's control server already listens there, and the
+      # monad.dubec.dev vhost proxies its control paths to it.
+      - "127.0.0.1:8084:8000"
+    volumes:
+      - jwt_keys:/app/config/jwt
+      - ./backend/monad-backend/config/lab/lab.json:/app/config/lab/lab.json:ro
+    networks:
+      - monad
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  jwt_keys:
+
+networks:
+  monad:
+    external: true

@@ -6,6 +6,7 @@ use App\Constants\ErrorCode;
 use App\Entity\User;
 use App\Exception\AuthException;
 use App\Exception\ValidationException;
+use App\Service\LabTelemetry;
 use App\Service\S3Service;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,8 +17,12 @@ use OpenApi\Attributes as OA;
 
 class S3Controller extends AbstractController
 {
+    /** Sidecars are a few kB; anything larger is not a sidecar and is streamed without inspection. */
+    private const MAX_INSPECTABLE_SIDECAR = 1024 * 1024;
+
     public function __construct(
         private S3Service $s3Service,
+        private LabTelemetry $telemetry,
     ) {
     }
 
@@ -312,11 +317,11 @@ class S3Controller extends AbstractController
         return $this->json($result, Response::HTTP_OK);
     }
 
-    #[Route('/api/storage/experiment-upload', name: 'api_storage_experiment_upload', methods: ['POST'])]
+    #[Route('/api/storage/session-upload', name: 'api_storage_session_upload', methods: ['POST'])]
     #[OA\Post(
-        path: '/api/storage/experiment-upload',
-        summary: 'Upload experiment data file to S3 (direct stream)',
-        description: 'Uploads experiment data directly to S3 by streaming from request body. NO temp file is created on the backend. Send raw binary body with required headers. Files are stored in experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}',
+        path: '/api/storage/session-upload',
+        summary: 'Upload one lab-session artefact to S3 (direct stream)',
+        description: 'Streams one artefact of a lab session straight from the request body to object storage; no temp file is created. Artefacts are stored at datasets/monad-app-sessions/{participantId}/{sessionId}/{filename}, the same convention the csid fleet captures use, so a phone session and a radio capture are siblings in one bucket. Upload the streams first and metadata.json last: its presence marks the session complete.',
         security: [['Bearer' => []]],
         tags: ['Storage']
     )]
@@ -327,10 +332,16 @@ class S3Controller extends AbstractController
         schema: new OA\Schema(type: 'string', example: 'ble_data.tsv')
     )]
     #[OA\Header(
-        header: 'X-Experiment-Id',
-        description: 'Experiment/Quest enrollment ID',
+        header: 'X-Session-Id',
+        description: 'Lab session UUID',
         required: true,
         schema: new OA\Schema(type: 'string', example: '550e8400-e29b-41d4-a716-446655440000')
+    )]
+    #[OA\Header(
+        header: 'X-Participant-Id',
+        description: 'Pseudonymous participant key. Never an e-mail: the account belongs to the game, the dataset carries only the pseudonym.',
+        required: false,
+        schema: new OA\Schema(type: 'string', example: '0198f2c1-1f3f-7c3a-9a1d-2f2b0a5f2f11')
     )]
     #[OA\RequestBody(
         required: true,
@@ -393,7 +404,7 @@ class S3Controller extends AbstractController
             ]
         )
     )]
-    public function experimentUpload(Request $request): JsonResponse
+    public function sessionUpload(Request $request): JsonResponse
     {
         $user = $this->getUser();
 
@@ -401,17 +412,20 @@ class S3Controller extends AbstractController
             throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
         }
 
-        // Get metadata from headers
         $filename = $request->headers->get('X-Filename');
-        $experimentId = $request->headers->get('X-Experiment-Id');
+        $sessionId = $request->headers->get('X-Session-Id');
         $contentType = $request->headers->get('Content-Type', 'text/tab-separated-values');
         $contentLength = (int) $request->headers->get('Content-Length', 0);
+
+        // The client may carry its own pseudonym; the authenticated user id is the fallback so a
+        // session can never be filed under an unattributable prefix.
+        $participantId = $request->headers->get('X-Participant-Id') ?: $user->getId()->toRfc4122();
 
         if (!$filename) {
             throw new ValidationException(ErrorCode::STORAGE_FILENAME_REQUIRED);
         }
 
-        if (!$experimentId) {
+        if (!$sessionId) {
             throw new ValidationException(ErrorCode::STORAGE_EXPERIMENT_ID_REQUIRED);
         }
 
@@ -419,14 +433,28 @@ class S3Controller extends AbstractController
             throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
         }
 
-        // Direct stream from php://input to S3 - no temp file!
-        $result = $this->s3Service->directExperimentStreamUpload(
+        // The sidecar is small and is the only artefact worth reading here; the sample streams are
+        // forwarded to object storage untouched. Read it before streaming, because php://input can
+        // only be consumed once.
+        $sidecar = null;
+        if ($filename === 'metadata.json' && $contentLength <= self::MAX_INSPECTABLE_SIDECAR) {
+            $sidecar = file_get_contents('php://input') ?: null;
+        }
+
+        // Direct stream from php://input to object storage — no temp file.
+        $result = $this->s3Service->directSessionStreamUpload(
             filename: $filename,
             contentType: $contentType,
             contentLength: $contentLength,
-            userId: $user->getId()->toRfc4122(),
-            experimentId: $experimentId,
+            participantId: $participantId,
+            sessionId: $sessionId,
+            body: $sidecar,
         );
+
+        $this->telemetry->artefactAccepted($filename);
+        if ($sidecar !== null) {
+            $this->telemetry->sessionCompleted($sidecar);
+        }
 
         return $this->json($result, Response::HTTP_OK);
     }

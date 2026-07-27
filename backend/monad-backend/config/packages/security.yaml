@@ -48,6 +48,9 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
+        # Liveness must not require a token: the container HEALTHCHECK, the host nginx upstream
+        # probe and any uptime monitor all call it unauthenticated, and a 401 reads as "down".
+        - { path: ^/api/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/login, roles: PUBLIC_ACCESS }

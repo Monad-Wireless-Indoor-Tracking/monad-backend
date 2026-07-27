@@ -24,27 +24,63 @@ class S3Service
     private S3Client $s3Client;
     private string $bucket;
     private string $region;
+    private string $endpoint;
     private string $presignedUrlExpiry;
 
+    /**
+     * The store is Hetzner Object Storage, not AWS.
+     *
+     * It speaks the S3 API, so the SDK is unchanged, but two settings are mandatory: an explicit
+     * endpoint, and path-style addressing (`https://<endpoint>/<bucket>/<key>` rather than
+     * `https://<bucket>.<endpoint>/<key>`) — virtual-hosted addressing needs a wildcard TLS
+     * certificate the provider does not issue.
+     *
+     * Sharing the project's bucket is the point: phone sessions then land in the same tenancy as
+     * the `csid` fleet captures and the simulation artefacts, so one set of credentials and one
+     * lifecycle policy covers every kind of measurement this project produces.
+     */
     public function __construct(
         string $awsRegion,
         string $awsBucket,
         string $awsAccessKeyId,
         string $awsSecretAccessKey,
         string $presignedUrlExpiry,
+        string $endpoint = '',
+        bool $usePathStyle = true,
     ) {
         $this->bucket = $awsBucket;
         $this->region = $awsRegion;
+        $this->endpoint = $endpoint;
         $this->presignedUrlExpiry = $presignedUrlExpiry;
 
-        $this->s3Client = new S3Client([
+        $config = [
             'version' => 'latest',
             'region' => $awsRegion,
             'credentials' => [
                 'key' => $awsAccessKeyId,
                 'secret' => $awsSecretAccessKey,
             ],
-        ]);
+        ];
+
+        if ($endpoint !== '') {
+            $config['endpoint'] = $endpoint;
+            $config['use_path_style_endpoint'] = $usePathStyle;
+        }
+
+        $this->s3Client = new S3Client($config);
+    }
+
+    /**
+     * Public URL for an object key. AWS-shaped URLs are only correct on AWS; with a custom
+     * endpoint the address is endpoint + bucket + key.
+     */
+    private function objectUrl(string $objectKey): string
+    {
+        if ($this->endpoint !== '') {
+            return sprintf('%s/%s/%s', rtrim($this->endpoint, '/'), $this->bucket, $objectKey);
+        }
+
+        return sprintf('https://%s.s3.%s.amazonaws.com/%s', $this->bucket, $this->region, $objectKey);
     }
 
     /**
@@ -127,12 +163,7 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? sprintf(
-                    'https://%s.s3.%s.amazonaws.com/%s',
-                    $this->bucket,
-                    $this->region,
-                    $objectKey
-                ),
+                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
                 'size' => $fileSize,
                 'contentType' => $contentType,
             ];
@@ -198,40 +229,26 @@ class S3Service
     }
 
     /**
-     * Generate a pre-signed URL for uploading experiment data directly to S3
+     * Pre-signed PUT URL for one lab-session artefact.
      *
-     * Uses experiment-specific path structure: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
+     * Same key layout as {@see directSessionStreamUpload}; used when a client would rather push
+     * bytes straight at the object store than proxy them through this API.
      *
-     * @param string $filename Original filename
-     * @param string $contentType MIME type of the file
-     * @param int $fileSize Expected file size in bytes
-     * @param string $userId User ID for organizing uploads
-     * @param string $experimentId Experiment ID for organizing uploads
      * @return array{uploadUrl: string, objectKey: string, expiresAt: string}
      */
-    public function generateExperimentUploadUrl(
+    public function generateSessionUploadUrl(
         string $filename,
         string $contentType,
         int $fileSize,
-        string $userId,
-        string $experimentId,
+        string $participantId,
+        string $sessionId,
     ): array {
         $this->validateUploadRequest($filename, $contentType, $fileSize);
 
-        // Generate date-based path components using current UTC time
-        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $year = $now->format('Y');
-        $month = $now->format('m');
-        $day = $now->format('d');
-
-        // Generate unique object key: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
         $objectKey = sprintf(
-            'experiments/%s/%s/%s/%s/%s/%s',
-            $year,
-            $month,
-            $day,
-            $userId,
-            $experimentId,
+            'datasets/monad-app-sessions/%s/%s/%s',
+            $this->sanitizeIdentifier($participantId),
+            $this->sanitizeIdentifier($sessionId),
             $this->sanitizeFilename($filename)
         );
 
@@ -248,16 +265,14 @@ class S3Service
                 $this->presignedUrlExpiry
             );
 
-            $expiresAt = new \DateTimeImmutable($this->presignedUrlExpiry);
-
             return [
                 'uploadUrl' => (string) $presignedRequest->getUri(),
                 'objectKey' => $objectKey,
-                'expiresAt' => $expiresAt->format(\DateTimeInterface::ATOM),
+                'expiresAt' => (new \DateTimeImmutable($this->presignedUrlExpiry))->format(\DateTimeInterface::ATOM),
             ];
-        } catch (\Exception $e) {
+        } catch (AwsException $e) {
             throw new SystemException(
-                ErrorCode::STORAGE_S3_UNAVAILABLE,
+                ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e
             );
         }
@@ -287,6 +302,21 @@ class S3Service
     /**
      * Sanitize filename to prevent path traversal and other issues
      */
+    /**
+     * Path-safe form of a participant or session identifier.
+     *
+     * These arrive from a client and become object-key path segments, so anything that could
+     * traverse (`..`, `/`) or collide must go. Restricting to `[A-Za-z0-9._-]` keeps UUIDs and
+     * pseudonymous participant keys intact while making traversal impossible by construction.
+     */
+    private function sanitizeIdentifier(string $value): string
+    {
+        $clean = preg_replace('/[^A-Za-z0-9._-]/', '_', $value) ?? '';
+        $clean = trim($clean, '.');
+
+        return $clean === '' ? 'unknown' : substr($clean, 0, 128);
+    }
+
     private function sanitizeFilename(string $filename): string
     {
         // Remove any directory components
@@ -331,16 +361,16 @@ class S3Service
         );
 
         try {
-            // Open php://input as a stream - this reads directly from request body
-            // No temp file is created!
-            $inputStream = fopen('php://input', 'rb');
+            // php://input can only be consumed once. When the caller already read it (to inspect a
+            // sidecar), forward that string; otherwise stream straight through with no temp file.
+            $inputStream = $body === null ? fopen('php://input', 'rb') : null;
 
             $result = $this->s3Client->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
-                'Body' => $inputStream,
+                'Body' => $body ?? $inputStream,
                 'ContentType' => $contentType,
-                'ContentLength' => $contentLength,
+                'ContentLength' => $body === null ? $contentLength : strlen($body),
             ]);
 
             if (is_resource($inputStream)) {
@@ -350,12 +380,7 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? sprintf(
-                    'https://%s.s3.%s.amazonaws.com/%s',
-                    $this->bucket,
-                    $this->region,
-                    $objectKey
-                ),
+                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
                 'size' => $contentLength,
                 'contentType' => $contentType,
             ];
@@ -368,55 +393,46 @@ class S3Service
     }
 
     /**
-     * Stream upload experiment data directly from php://input to S3 (no temp file)
+     * Stream one lab-session artefact from php://input straight to S3 (no temp file).
      *
-     * Uses experiment-specific path structure: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
-     * Client must send raw binary body (not multipart/form-data)
+     * Key layout: `datasets/monad-app-sessions/{participantId}/{sessionId}/{filename}`.
      *
-     * @param string $filename Filename from header
-     * @param string $contentType Content-Type from header
-     * @param int $contentLength Content-Length from header
-     * @param string $userId User ID for organizing uploads
-     * @param string $experimentId Experiment/Quest enrollment ID
+     * This replaces the previous `experiments/{y}/{m}/{d}/{userId}/{enrollmentId}/` layout, which
+     * partitioned by *upload date*. That made a session's artefacts land in different prefixes
+     * whenever an upload was retried across midnight, and it could not be joined to a `csid`
+     * capture, which is addressed by session rather than by date. The prefix now mirrors the
+     * fleet's own convention so a phone session and a radio capture are siblings in one bucket.
+     *
      * @return array{success: bool, objectKey: string, url: string, size: int, contentType: string}
      */
-    public function directExperimentStreamUpload(
+    public function directSessionStreamUpload(
         string $filename,
         string $contentType,
         int $contentLength,
-        string $userId,
-        string $experimentId,
+        string $participantId,
+        string $sessionId,
+        ?string $body = null,
     ): array {
         $this->validateUploadRequest($filename, $contentType, $contentLength);
 
-        // Generate date-based path components using current UTC time
-        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $year = $now->format('Y');
-        $month = $now->format('m');
-        $day = $now->format('d');
-
-        // Generate unique object key: experiments/{year}/{month}/{day}/{userId}/{experimentId}/{filename}
         $objectKey = sprintf(
-            'experiments/%s/%s/%s/%s/%s/%s',
-            $year,
-            $month,
-            $day,
-            $userId,
-            $experimentId,
+            'datasets/monad-app-sessions/%s/%s/%s',
+            $this->sanitizeIdentifier($participantId),
+            $this->sanitizeIdentifier($sessionId),
             $this->sanitizeFilename($filename)
         );
 
         try {
-            // Open php://input as a stream - this reads directly from request body
-            // No temp file is created!
-            $inputStream = fopen('php://input', 'rb');
+            // php://input can only be consumed once. When the caller already read it (to inspect a
+            // sidecar), forward that string; otherwise stream straight through with no temp file.
+            $inputStream = $body === null ? fopen('php://input', 'rb') : null;
 
             $result = $this->s3Client->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
-                'Body' => $inputStream,
+                'Body' => $body ?? $inputStream,
                 'ContentType' => $contentType,
-                'ContentLength' => $contentLength,
+                'ContentLength' => $body === null ? $contentLength : strlen($body),
             ]);
 
             if (is_resource($inputStream)) {
@@ -426,12 +442,7 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? sprintf(
-                    'https://%s.s3.%s.amazonaws.com/%s',
-                    $this->bucket,
-                    $this->region,
-                    $objectKey
-                ),
+                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
                 'size' => $contentLength,
                 'contentType' => $contentType,
             ];
