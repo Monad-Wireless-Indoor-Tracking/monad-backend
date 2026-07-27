@@ -6,10 +6,19 @@ name: Docker build
 
 on:
   push:
-    branches: [main]
+    # Feature branches publish images too. Deployment is an Ansible play against a
+    # long-lived host, so being able to run a branch build there — without merging
+    # it to main first — is the difference between testing a change and guessing.
+    branches: [main, 'feature/**']
     tags: ['*.*.*']
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  # A second push to the same branch supersedes the first; nothing downstream wants
+  # the older image.
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -46,12 +55,18 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            # `feature/refactor` becomes `feature-refactor` — slashes are not legal
+            # in a tag, and the action substitutes them.
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha,format=long
+            # `latest` ONLY on the default branch. Without this pin a feature build
+            # would silently become the tag an unpinned deployment pulls.
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./backend/monad-backend
@@ -60,3 +75,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The deploy command is the thing an operator actually wants out of a branch
+      # build, and reconstructing the tag by hand is where the slash substitution
+      # trips people up. Print it.
+      - name: Deployment hint
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### Image published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Deploy this build:"
+            echo
+            echo '```bash'
+            echo "cd infra/ansible"
+            echo "ansible-playbook playbooks/monad-api.yml \\"
+            echo "  -e monad_api_image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$(echo '${{ github.ref_name }}' | tr '/' '-')"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

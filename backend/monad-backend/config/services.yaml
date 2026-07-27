@@ -4,9 +4,8 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
-    # Hetzner Object Storage requires path-style addressing; AWS does not care.
-    env(S3_USE_PATH_STYLE_DEFAULT): '1'
-    env(S3_ENDPOINT): ''
+    # Hetzner Object Storage requires path-style addressing.
+    env(HETZNER_S3_USE_PATH_STYLE_DEFAULT): '1'
 
 services:
     # default configuration for services in *this* file
@@ -28,18 +27,18 @@ services:
     # please note that last definitions always *replace* previous ones
 
     # S3 Service configuration
-    # Object storage is Hetzner, not AWS. The env names keep their AWS_* prefix because they are
-    # the SDK's vocabulary, but S3_ENDPOINT is what actually points them at the project's bucket —
-    # the same tenancy the csid fleet captures and simulation artefacts live in.
+    # Object storage is Hetzner Object Storage — the same tenancy the csid fleet captures and the
+    # simulation artefacts live in, addressed by the same HETZNER_S3_* variables monad-knowledge
+    # already uses, so one ansible-vault secret set covers both.
     App\Service\S3Service:
         arguments:
-            $awsRegion: '%env(AWS_S3_REGION)%'
-            $awsBucket: '%env(AWS_S3_BUCKET)%'
-            $awsAccessKeyId: '%env(AWS_S3_ACCESS_KEY_ID)%'
-            $awsSecretAccessKey: '%env(AWS_S3_SECRET_ACCESS_KEY)%'
-            $presignedUrlExpiry: '%env(AWS_S3_PRESIGNED_URL_EXPIRY)%'
-            $endpoint: '%env(default::S3_ENDPOINT)%'
-            $usePathStyle: '%env(bool:default:S3_USE_PATH_STYLE_DEFAULT:S3_USE_PATH_STYLE)%'
+            $region: '%env(HETZNER_S3_REGION)%'
+            $bucket: '%env(HETZNER_S3_BUCKET)%'
+            $accessKey: '%env(HETZNER_S3_ACCESS_KEY)%'
+            $secretKey: '%env(HETZNER_S3_SECRET_KEY)%'
+            $presignedUrlExpiry: '%env(HETZNER_S3_PRESIGNED_URL_EXPIRY)%'
+            $endpoint: '%env(HETZNER_S3_ENDPOINT)%'
+            $usePathStyle: '%env(bool:default:HETZNER_S3_USE_PATH_STYLE_DEFAULT:HETZNER_S3_USE_PATH_STYLE)%'
 
     # Operator-authored lab bundle. A file, not a table: it describes physical reality and is
     # edited by whoever is standing next to the hardware.

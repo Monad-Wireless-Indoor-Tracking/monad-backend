@@ -5,8 +5,9 @@ namespace App\Service;
 use App\Constants\ErrorCode;
 use App\Exception\SystemException;
 use App\Exception\ValidationException;
-use Aws\Exception\AwsException;
-use Aws\S3\S3Client;
+use AsyncAws\Core\Exception\Http\HttpException;
+use AsyncAws\S3\Input\PutObjectRequest;
+use AsyncAws\S3\S3Client;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Uid\Uuid;
 
@@ -28,59 +29,56 @@ class S3Service
     private string $presignedUrlExpiry;
 
     /**
-     * The store is Hetzner Object Storage, not AWS.
+     * The store is **Hetzner Object Storage**. There is no AWS anywhere in this project.
      *
-     * It speaks the S3 API, so the SDK is unchanged, but two settings are mandatory: an explicit
-     * endpoint, and path-style addressing (`https://<endpoint>/<bucket>/<key>` rather than
-     * `https://<bucket>.<endpoint>/<key>`) — virtual-hosted addressing needs a wildcard TLS
-     * certificate the provider does not issue.
+     * The client is `async-aws/s3` rather than `aws/aws-sdk-php`: a focused S3 implementation
+     * (two small packages instead of the monolith's ~400 service clients) that speaks the same
+     * protocol and carries no vendor defaults. The endpoint is required rather than defaulted,
+     * object URLs are built from it, and the error messages name the credential fields this
+     * deployment actually has.
      *
-     * Sharing the project's bucket is the point: phone sessions then land in the same tenancy as
-     * the `csid` fleet captures and the simulation artefacts, so one set of credentials and one
-     * lifecycle policy covers every kind of measurement this project produces.
+     * Path-style addressing is mandatory: virtual-hosted addressing
+     * (`https://<bucket>.<endpoint>/<key>`) needs a wildcard TLS certificate Hetzner does not
+     * issue.
+     *
+     * Sharing the project's bucket is the point — phone sessions land in the same tenancy as the
+     * `csid` fleet captures and the simulation artefacts, so one credential set and one lifecycle
+     * policy cover every kind of measurement this project produces.
      */
     public function __construct(
-        string $awsRegion,
-        string $awsBucket,
-        string $awsAccessKeyId,
-        string $awsSecretAccessKey,
+        string $region,
+        string $bucket,
+        string $accessKey,
+        string $secretKey,
         string $presignedUrlExpiry,
-        string $endpoint = '',
+        string $endpoint,
         bool $usePathStyle = true,
     ) {
-        $this->bucket = $awsBucket;
-        $this->region = $awsRegion;
+        $this->bucket = $bucket;
+        $this->region = $region;
         $this->endpoint = $endpoint;
         $this->presignedUrlExpiry = $presignedUrlExpiry;
 
-        $config = [
-            'version' => 'latest',
-            'region' => $awsRegion,
-            'credentials' => [
-                'key' => $awsAccessKeyId,
-                'secret' => $awsSecretAccessKey,
-            ],
-        ];
-
-        if ($endpoint !== '') {
-            $config['endpoint'] = $endpoint;
-            $config['use_path_style_endpoint'] = $usePathStyle;
+        if ($endpoint === '') {
+            // No silent fallback to AWS. An empty endpoint used to mean "talk to Amazon", which is
+            // exactly the kind of default that sends research data to the wrong provider without
+            // anyone noticing.
+            throw new SystemException(ErrorCode::SYSTEM_INTERNAL_ERROR);
         }
 
-        $this->s3Client = new S3Client($config);
+        $this->s3Client = new S3Client([
+            'endpoint' => $endpoint,
+            'region' => $region,
+            'accessKeyId' => $accessKey,
+            'accessKeySecret' => $secretKey,
+            'pathStyleEndpoint' => $usePathStyle,
+        ]);
     }
 
-    /**
-     * Public URL for an object key. AWS-shaped URLs are only correct on AWS; with a custom
-     * endpoint the address is endpoint + bucket + key.
-     */
+    /** Public URL for an object key: endpoint + bucket + key, path-style. */
     private function objectUrl(string $objectKey): string
     {
-        if ($this->endpoint !== '') {
-            return sprintf('%s/%s/%s', rtrim($this->endpoint, '/'), $this->bucket, $objectKey);
-        }
-
-        return sprintf('https://%s.s3.%s.amazonaws.com/%s', $this->bucket, $this->region, $objectKey);
+        return sprintf('%s/%s/%s', rtrim($this->endpoint, '/'), $this->bucket, $objectKey);
     }
 
     /**
@@ -91,9 +89,7 @@ class S3Service
     public function testConnection(): array
     {
         try {
-            $this->s3Client->headBucket([
-                'Bucket' => $this->bucket,
-            ]);
+            $this->s3Client->bucketExists(['Bucket' => $this->bucket])->resolve();
 
             return [
                 'success' => true,
@@ -101,14 +97,15 @@ class S3Service
                 'region' => $this->region,
                 'message' => 'Successfully connected to S3 bucket',
             ];
-        } catch (AwsException $e) {
-            $errorCode = $e->getAwsErrorCode();
-            $message = match ($errorCode) {
-                'NoSuchBucket' => 'Bucket does not exist',
-                'AccessDenied', 'Forbidden' => 'Access denied - check IAM permissions',
-                'InvalidAccessKeyId' => 'Invalid AWS Access Key ID',
-                'SignatureDoesNotMatch' => 'Invalid AWS Secret Access Key',
-                default => $e->getAwsErrorMessage() ?? $e->getMessage(),
+        } catch (HttpException $e) {
+            // async-aws surfaces the HTTP status rather than Amazon's error-code vocabulary, which
+            // is the more honest signal against a third-party S3 implementation anyway.
+            $errorCode = (string) $e->getResponse()->getStatusCode();
+            $message = match ($e->getResponse()->getStatusCode()) {
+                404 => 'Bucket does not exist',
+                403 => 'Access denied - check HETZNER_S3_ACCESS_KEY / HETZNER_S3_SECRET_KEY and the bucket policy',
+                401 => 'Invalid credentials',
+                default => $e->getMessage(),
             };
 
             return [
@@ -148,13 +145,13 @@ class S3Service
             // Open file stream - this avoids loading entire file into memory
             $stream = fopen($file->getPathname(), 'rb');
 
-            $result = $this->s3Client->putObject([
+            $this->s3Client->putObject(new PutObjectRequest([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
                 'Body' => $stream,
                 'ContentType' => $contentType,
                 'ContentLength' => $fileSize,
-            ]);
+            ]))->resolve();
 
             if (is_resource($stream)) {
                 fclose($stream);
@@ -163,11 +160,11 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
+                'url' => $this->objectUrl($objectKey),
                 'size' => $fileSize,
                 'contentType' => $contentType,
             ];
-        } catch (AwsException $e) {
+        } catch (HttpException $e) {
             throw new SystemException(
                 ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e
@@ -201,22 +198,18 @@ class S3Service
         );
 
         try {
-            $cmd = $this->s3Client->getCommand('PutObject', [
+            $request = new PutObjectRequest([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
                 'ContentType' => $contentType,
                 'ContentLength' => $fileSize,
             ]);
 
-            $presignedRequest = $this->s3Client->createPresignedRequest(
-                $cmd,
-                $this->presignedUrlExpiry
-            );
-
             $expiresAt = new \DateTimeImmutable($this->presignedUrlExpiry);
+            $uploadUrl = $this->s3Client->presign($request, $expiresAt);
 
             return [
-                'uploadUrl' => (string) $presignedRequest->getUri(),
+                'uploadUrl' => $uploadUrl,
                 'objectKey' => $objectKey,
                 'expiresAt' => $expiresAt->format(\DateTimeInterface::ATOM),
             ];
@@ -253,24 +246,22 @@ class S3Service
         );
 
         try {
-            $cmd = $this->s3Client->getCommand('PutObject', [
+            $request = new PutObjectRequest([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
                 'ContentType' => $contentType,
                 'ContentLength' => $fileSize,
             ]);
 
-            $presignedRequest = $this->s3Client->createPresignedRequest(
-                $cmd,
-                $this->presignedUrlExpiry
-            );
+            $expiresAt = new \DateTimeImmutable($this->presignedUrlExpiry);
+            $uploadUrl = $this->s3Client->presign($request, $expiresAt);
 
             return [
-                'uploadUrl' => (string) $presignedRequest->getUri(),
+                'uploadUrl' => $uploadUrl,
                 'objectKey' => $objectKey,
-                'expiresAt' => (new \DateTimeImmutable($this->presignedUrlExpiry))->format(\DateTimeInterface::ATOM),
+                'expiresAt' => $expiresAt->format(\DateTimeInterface::ATOM),
             ];
-        } catch (AwsException $e) {
+        } catch (HttpException $e) {
             throw new SystemException(
                 ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e
@@ -365,13 +356,13 @@ class S3Service
             // sidecar), forward that string; otherwise stream straight through with no temp file.
             $inputStream = $body === null ? fopen('php://input', 'rb') : null;
 
-            $result = $this->s3Client->putObject([
+            $this->s3Client->putObject(new PutObjectRequest([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
                 'Body' => $body ?? $inputStream,
                 'ContentType' => $contentType,
                 'ContentLength' => $body === null ? $contentLength : strlen($body),
-            ]);
+            ]))->resolve();
 
             if (is_resource($inputStream)) {
                 fclose($inputStream);
@@ -380,11 +371,11 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
+                'url' => $this->objectUrl($objectKey),
                 'size' => $contentLength,
                 'contentType' => $contentType,
             ];
-        } catch (AwsException $e) {
+        } catch (HttpException $e) {
             throw new SystemException(
                 ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e
@@ -427,13 +418,13 @@ class S3Service
             // sidecar), forward that string; otherwise stream straight through with no temp file.
             $inputStream = $body === null ? fopen('php://input', 'rb') : null;
 
-            $result = $this->s3Client->putObject([
+            $this->s3Client->putObject(new PutObjectRequest([
                 'Bucket' => $this->bucket,
                 'Key' => $objectKey,
                 'Body' => $body ?? $inputStream,
                 'ContentType' => $contentType,
                 'ContentLength' => $body === null ? $contentLength : strlen($body),
-            ]);
+            ]))->resolve();
 
             if (is_resource($inputStream)) {
                 fclose($inputStream);
@@ -442,11 +433,11 @@ class S3Service
             return [
                 'success' => true,
                 'objectKey' => $objectKey,
-                'url' => $result['ObjectURL'] ?? $this->objectUrl($objectKey),
+                'url' => $this->objectUrl($objectKey),
                 'size' => $contentLength,
                 'contentType' => $contentType,
             ];
-        } catch (AwsException $e) {
+        } catch (HttpException $e) {
             throw new SystemException(
                 ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e

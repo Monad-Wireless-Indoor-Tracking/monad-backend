@@ -6,7 +6,7 @@
 #   * binds only to loopback — TLS termination is the host nginx that already serves
 #     monad.dubec.dev, so there is exactly one certificate and one vhost story;
 #   * no source bind-mount and no `composer install` at boot: the image is the artefact;
-#   * object storage is Hetzner, configured by S3_ENDPOINT rather than implied by region.
+#   * object storage is Hetzner, configured by HETZNER_S3_ENDPOINT rather than implied by region.
 #
 # The lab bundle is mounted read-only from the host so an operator can edit the rig description
 # without rebuilding or restarting anything the phones depend on.
@@ -46,13 +46,13 @@ services:
       # The image carries a default; without this line the .env value would be inert.
       DEFAULT_URI: ${DEFAULT_URI:-https://api.monad.dubec.dev}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-^https://(api\.)?monad\.dubec\.dev$$}
-      S3_ENDPOINT: ${S3_ENDPOINT}
-      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-1}
-      AWS_S3_REGION: ${AWS_S3_REGION}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
-      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
-      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
-      AWS_S3_PRESIGNED_URL_EXPIRY: ${AWS_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_USE_PATH_STYLE: ${HETZNER_S3_USE_PATH_STYLE:-1}
+      HETZNER_S3_REGION: ${HETZNER_S3_REGION}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_PRESIGNED_URL_EXPIRY: ${HETZNER_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
     ports:
       # Loopback only; api.monad.dubec.dev is terminated by the host nginx.
       # NOT 8080 — Headscale's control server already listens there, and the

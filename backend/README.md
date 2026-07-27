@@ -37,10 +37,10 @@ Required variables:
 | `APP_SECRET` | Symfony app secret |
 | `JWT_PASSPHRASE` | JWT key passphrase |
 | `CORS_ALLOW_ORIGIN` | CORS regex pattern |
-| `AWS_S3_BUCKET` | S3 bucket name |
-| `AWS_S3_ACCESS_KEY_ID` | AWS access key |
-| `AWS_S3_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_S3_REGION` | AWS region (default `eu-central-1`) |
+| `HETZNER_S3_BUCKET` | S3 bucket name |
+| `HETZNER_S3_ACCESS_KEY` | AWS access key |
+| `HETZNER_S3_SECRET_KEY` | AWS secret key |
+| `HETZNER_S3_REGION` | AWS region (default `eu-central-1`) |
 
 ### 2. Start services
 

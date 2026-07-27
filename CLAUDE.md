@@ -5,9 +5,9 @@ API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL 16.
 - **Deployment**: `api.monad.dubec.dev` — project host (Hetzner CCX33), behind the host nginx that
   already terminates TLS for `monad.dubec.dev`. Container binds loopback only; see
   `docker-compose.deploy.yml`.
-- **Storage**: Hetzner Object Storage (S3-compatible), the project's bucket — the same tenancy as
-  the `csid` fleet CSI captures and the simulation artefacts. Configured by `S3_ENDPOINT` +
-  `S3_USE_PATH_STYLE`; Hetzner has no wildcard certificate, so path-style addressing is required.
+- **Storage**: Hetzner Object Storage via `async-aws/s3` (no AWS SDK, no AWS anything), the project's bucket — the same tenancy as
+  the `csid` fleet CSI captures and the simulation artefacts. Configured by `HETZNER_S3_ENDPOINT` +
+  `HETZNER_S3_USE_PATH_STYLE`; Hetzner has no wildcard certificate, so path-style addressing is required.
 - **Session key layout**: `datasets/monad-app-sessions/{participantId}/{sessionId}/{filename}`,
   mirroring the fleet convention so a phone session and a radio capture are siblings in one bucket
   and joinable by session rather than by upload date.

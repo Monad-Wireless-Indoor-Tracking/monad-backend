@@ -15,7 +15,7 @@ certbot --nginx -d api.monad.dubec.dev
 ```
 
 Create `.env` next to `docker-compose.deploy.yml` (gitignored) with `POSTGRES_*`, `APP_SECRET`,
-`JWT_PASSPHRASE`, and the `S3_*` / `AWS_S3_*` values for the project's Hetzner bucket. Then author
+`JWT_PASSPHRASE`, and the `HETZNER_S3_*` values for the project's bucket. Then author
 `backend/monad-backend/config/lab/lab.json` from `lab.example.json` — the API serves an empty
 bundle without it, and phones will have no collector to talk to.
 
@@ -31,6 +31,34 @@ curl -fsS https://api.monad.dubec.dev/api/health
 The entrypoint waits for Postgres, runs migrations, warms the cache against the *runtime*
 environment, and only then starts the server. The JWT keypair lives in a named volume so tokens
 survive a redeploy — regenerating it would sign every phone in the field out mid-session.
+
+## Object storage
+
+Hetzner Object Storage, reached with `async-aws/s3`. `HETZNER_S3_ENDPOINT` is **required** — there
+is no default, deliberately: an absent endpoint used to mean "talk to Amazon", which is the kind of
+default that ships research data to the wrong provider unnoticed. Path-style addressing is
+mandatory (Hetzner issues no wildcard certificate for virtual-hosted bucket names).
+
+## Generating `JWT_PASSPHRASE`
+
+It is an arbitrary high-entropy string that encrypts the LexikJWT **private key** — not a key
+itself, and not derived from anything:
+
+```bash
+openssl rand -base64 48
+```
+
+Two properties matter more than the generation method:
+
+- **Set it before first boot.** The entrypoint generates the keypair into a named volume on first
+  start and encrypts it with whatever passphrase is present. There is no later opportunity.
+- **Never change it afterwards.** The passphrase is the only thing that can decrypt the existing
+  private key. Changing it does not rotate anything — it makes the key unreadable, the API fails to
+  sign or verify, and every phone in the field is signed out mid-session. If you must rotate,
+  delete the `jwt_keys` volume and the passphrase together, accepting that every token dies.
+
+Store it in ansible-vault as `vault_monad_api_jwt_passphrase`, alongside `APP_SECRET`
+(`openssl rand -hex 32`) and the Postgres password.
 
 ## Observability
 
