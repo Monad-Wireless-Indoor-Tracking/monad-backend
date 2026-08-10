@@ -18,3 +18,8 @@
 # access_points[].password is an AP passphrase and collector.host is a private address.
 # lab.example.json (committed) is the shape; lab.json is the rig.
 /config/lab/lab.json
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###

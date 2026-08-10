@@ -102,6 +102,21 @@ class QuestController extends AbstractController
                 $quests = $questRepository->findActiveQuests();
             }
 
+            // Capability filtering. A device sends what it can do; a quest that needs more is
+            // withheld rather than offered and failed halfway through. Sending nothing keeps the
+            // old behaviour (everything is offered), so existing clients are unaffected.
+            $declared = $request->query->get('capabilities');
+            if (is_string($declared) && '' !== trim($declared)) {
+                $deviceCapabilities = array_values(array_filter(array_map(
+                    'trim',
+                    explode(',', $declared)
+                )));
+                $quests = array_values(array_filter(
+                    $quests,
+                    static fn ($quest) => $quest->isSupportedBy($deviceCapabilities)
+                ));
+            }
+
             // Transform entities to DTOs
             $questDtos = array_map(
                 fn($quest) => (new QuestListResponseDto($quest))->toArray(),
@@ -143,7 +158,7 @@ class QuestController extends AbstractController
                 new OA\Property(property: 'description', type: 'string', example: 'Explore the campus and discover hidden locations', description: 'Quest description'),
                 new OA\Property(property: 'points', type: 'number', format: 'float', example: 100.0, description: 'Points awarded for completion'),
                 new OA\Property(property: 'estimatedDuration', type: 'integer', example: 30, nullable: true, description: 'Estimated duration in minutes'),
-                new OA\Property(property: 'featuredImage', type: 'string', example: 'https://bucket.s3.amazonaws.com/public/quest-image.jpg', nullable: true, description: 'Featured image URL'),
+                new OA\Property(property: 'featuredImage', type: 'string', example: 'https://fsn1.your-objectstorage.com/monad-knowledge/public/quest-image.jpg', nullable: true, description: 'Featured image URL'),
                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2025-11-11 15:28:44', description: 'Quest creation timestamp'),
                 new OA\Property(
                     property: 'steps',

@@ -45,6 +45,21 @@ class Quest
     #[Assert\PositiveOrZero(message: 'Points must be a positive number or zero')]
     private float $points = 0.0;
 
+    /**
+     * Capability tokens a device must satisfy to be offered this quest.
+     *
+     * A quest needing a sensor the handset lacks is not a degraded run — it is a run that looks
+     * complete and is missing the measurement. So the catalogue filters on this rather than letting
+     * the app discover the gap halfway through.
+     *
+     * Free-form strings on purpose: adding a sensor is a token on the device plus a token here, not
+     * a schema migration.
+     *
+     * @var string[]
+     */
+    #[ORM\Column(name: 'required_capabilities', type: Types::JSON)]
+    private array $requiredCapabilities = [];
+
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     #[Assert\Positive(message: 'Estimated duration must be a positive number')]
     private ?int $estimatedDuration = null;
@@ -229,5 +244,25 @@ class Quest
         }
 
         return $this;
+    }
+
+    /** @return string[] */
+    public function getRequiredCapabilities(): array
+    {
+        return $this->requiredCapabilities;
+    }
+
+    /** @param string[] $capabilities */
+    public function setRequiredCapabilities(array $capabilities): static
+    {
+        $this->requiredCapabilities = array_values(array_unique($capabilities));
+
+        return $this;
+    }
+
+    /** @param string[] $deviceCapabilities */
+    public function isSupportedBy(array $deviceCapabilities): bool
+    {
+        return [] === array_diff($this->requiredCapabilities, $deviceCapabilities);
     }
 }

@@ -10,6 +10,8 @@ namespace App\Constants;
  * - AUTH: Authentication and authorization errors (001-099)
  * - VALIDATION: Input validation errors (100-199)
  * - RESOURCE: Resource-related errors (200-299)
+ * - STORAGE: Object-storage errors (300-399)
+ * - LAB: Lab instrument and ground-truth errors (400-499)
  * - SYSTEM: System and server errors (900-999)
  */
 class ErrorCode
@@ -47,6 +49,12 @@ class ErrorCode
     public const STORAGE_FILENAME_REQUIRED = 'STORAGE_303';
     public const STORAGE_S3_UNAVAILABLE = 'STORAGE_304';
     public const STORAGE_EXPERIMENT_ID_REQUIRED = 'STORAGE_305';
+
+    // Lab Errors (400-499)
+    public const LAB_GROUND_TRUTH_EMPTY_BATCH = 'LAB_400';
+    public const LAB_GROUND_TRUTH_BATCH_TOO_LARGE = 'LAB_401';
+    public const LAB_GROUND_TRUTH_MALFORMED_BODY = 'LAB_402';
+    public const LAB_SESSION_ID_REQUIRED = 'LAB_403';
 
     // System Errors (900-999)
     public const SYSTEM_INTERNAL_ERROR = 'SYSTEM_900';
@@ -88,6 +96,11 @@ class ErrorCode
             self::STORAGE_FILENAME_REQUIRED => 'Filename is required',
             self::STORAGE_S3_UNAVAILABLE => 'Storage service is temporarily unavailable',
             self::STORAGE_EXPERIMENT_ID_REQUIRED => 'Experiment ID is required',
+
+            self::LAB_GROUND_TRUTH_EMPTY_BATCH => 'No ground-truth events in request',
+            self::LAB_GROUND_TRUTH_BATCH_TOO_LARGE => 'Too many ground-truth events in one request',
+            self::LAB_GROUND_TRUTH_MALFORMED_BODY => 'Request body is not a ground-truth event or batch',
+            self::LAB_SESSION_ID_REQUIRED => 'Lab session id is required',
 
             self::SYSTEM_INTERNAL_ERROR => 'Internal server error',
             self::SYSTEM_DATABASE_ERROR => 'Database operation failed',

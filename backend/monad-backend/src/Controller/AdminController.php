@@ -79,7 +79,7 @@ class AdminController extends AbstractController
                     property: 'featured_image',
                     type: 'string',
                     nullable: true,
-                    example: 'https://bucket.s3.amazonaws.com/public/quest-image.jpg',
+                    example: 'https://fsn1.your-objectstorage.com/monad-knowledge/public/quest-image.jpg',
                     description: 'Featured image URL (max 512 characters)'
                 ),
                 new OA\Property(

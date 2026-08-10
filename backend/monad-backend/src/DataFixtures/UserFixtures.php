@@ -19,6 +19,15 @@ class UserFixtures extends Fixture
 
     public function load(ObjectManager $manager): void
     {
+        // Idempotent: seeding an already-populated database (a deployment, or an --append run
+        // that pulls this in as a dependency) must not collide on the unique e-mail.
+        $existing = $manager->getRepository(User::class)->findOneBy(['email' => 'admin@fiit.stuba.sk']);
+        if ($existing instanceof User) {
+            $this->addReference(self::SUPERADMIN_REFERENCE, $existing);
+
+            return;
+        }
+
         $superadmin = new User();
         $superadmin->setEmail('admin@fiit.stuba.sk');
         $superadmin->setName('FIIT Admin');

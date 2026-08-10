@@ -33,6 +33,11 @@ services:
       JWT_PUBLIC_KEY: /var/www/html/config/jwt/public.pem
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+      # The endpoint is mandatory in S3Service — there is deliberately no fallback, because an
+      # empty endpoint used to mean "talk to Amazon". Omitting these two here made every
+      # session upload 500 with an env-fallback error that named neither of them.
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_USE_PATH_STYLE: ${HETZNER_S3_USE_PATH_STYLE:-1}
       HETZNER_S3_REGION: ${HETZNER_S3_REGION:-eu-central-1}
       HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET}
       HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}

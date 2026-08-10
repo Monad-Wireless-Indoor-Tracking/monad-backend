@@ -68,7 +68,7 @@ class S3Controller extends AbstractController
                 new OA\Property(
                     property: 'uploadUrl',
                     type: 'string',
-                    example: 'https://bucket.s3.region.amazonaws.com/uploads/user-id/uuid/filename.csv?X-Amz-...',
+                    example: 'https://fsn1.your-objectstorage.com/monad-knowledge/uploads/user-id/uuid/filename.csv?X-Amz-...',
                     description: 'Pre-signed URL for uploading. Use HTTP PUT with the file content.'
                 ),
                 new OA\Property(
@@ -247,7 +247,7 @@ class S3Controller extends AbstractController
                 new OA\Property(
                     property: 'url',
                     type: 'string',
-                    example: 'https://bucket.s3.region.amazonaws.com/uploads/...',
+                    example: 'https://fsn1.your-objectstorage.com/monad-knowledge/uploads/...',
                     description: 'URL of the uploaded file'
                 ),
                 new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),
@@ -366,7 +366,7 @@ class S3Controller extends AbstractController
                 new OA\Property(
                     property: 'url',
                     type: 'string',
-                    example: 'https://bucket.s3.region.amazonaws.com/experiments/...',
+                    example: 'https://fsn1.your-objectstorage.com/monad-knowledge/datasets/monad-app-sessions/...',
                     description: 'URL of the uploaded file'
                 ),
                 new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),

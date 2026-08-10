@@ -55,6 +55,65 @@ jobs:
           php bin/console lint:yaml config
           php bin/console debug:router --no-interaction | grep -q api_lab_config
           php bin/console debug:router --no-interaction | grep -q api_storage_session_upload
+          php bin/console debug:router --no-interaction | grep -q api_lab_ground_truth_ingest
+          php bin/console debug:router --no-interaction | grep -q api_lab_ground_truth_aggregate
+
+  tests:
+    name: Unit and integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: monad
+          POSTGRES_USER: monad
+          POSTGRES_PASSWORD: monad
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U monad" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      # The ground-truth idempotency guarantee IS a UNIQUE index, so the suite runs against a real
+      # PostgreSQL rather than a double. Doctrine's `when@test` config appends `_test`, so the
+      # database the tests actually use is `monad_test`.
+      DATABASE_URL: postgresql://monad:monad@127.0.0.1:5432/monad?serverVersion=16&charset=utf8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, zip, intl, opentelemetry
+          coverage: none
+
+      - name: Install dependencies
+        working-directory: backend/monad-backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare test database
+        working-directory: backend/monad-backend
+        env:
+          APP_ENV: test
+        run: |
+          php bin/console doctrine:database:create --if-not-exists --no-interaction
+          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+      # A migration that drifts from its mapping is the failure mode that only ever shows up in
+      # production, so it is asserted here rather than trusted.
+      - name: Assert ground-truth mapping matches the migration
+        working-directory: backend/monad-backend
+        env:
+          APP_ENV: test
+        run: |
+          php bin/console doctrine:schema:update --dump-sql \
+            | tee /tmp/drift.sql
+          if grep -qi 'ground_truth' /tmp/drift.sql; then
+            echo "::error::ground_truth schema drifted from its Doctrine mapping"; exit 1
+          fi
+
+      - name: PHPUnit
+        working-directory: backend/monad-backend
+        run: php vendor/bin/phpunit
 
   smoke:
     name: Container smoke test

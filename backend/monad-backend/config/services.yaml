@@ -5,7 +5,12 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     # Hetzner Object Storage requires path-style addressing.
-    env(HETZNER_S3_USE_PATH_STYLE_DEFAULT): '1'
+    # Default for the variable itself, not a separate parameter. It used to be declared as
+    # `env(HETZNER_S3_USE_PATH_STYLE_DEFAULT)` and consumed via `default:HETZNER_S3_USE_PATH_STYLE_DEFAULT:...`,
+    # but the `default:` processor resolves a *parameter*, not an env var — so container
+    # compilation failed with "parameter not found" and every session upload returned 500,
+    # whether or not the variable was set.
+    env(HETZNER_S3_USE_PATH_STYLE): '1'
 
 services:
     # default configuration for services in *this* file
@@ -38,7 +43,7 @@ services:
             $secretKey: '%env(HETZNER_S3_SECRET_KEY)%'
             $presignedUrlExpiry: '%env(HETZNER_S3_PRESIGNED_URL_EXPIRY)%'
             $endpoint: '%env(HETZNER_S3_ENDPOINT)%'
-            $usePathStyle: '%env(bool:default:HETZNER_S3_USE_PATH_STYLE_DEFAULT:HETZNER_S3_USE_PATH_STYLE)%'
+            $usePathStyle: '%env(bool:HETZNER_S3_USE_PATH_STYLE)%'
 
     # Operator-authored lab bundle. A file, not a table: it describes physical reality and is
     # edited by whoever is standing next to the hardware.
