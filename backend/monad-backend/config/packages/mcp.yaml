@@ -34,3 +34,15 @@ mcp:
         http: true
     http:
         path: '/mcp'
+        # DNS-rebinding protection. The SDK defaults this to localhost only and answers anything
+        # else with a bare 403 "Invalid Host header" — which looks exactly like a rejected
+        # credential and is not, so it costs an afternoon if you meet it without knowing.
+        #
+        # Every name this endpoint is legitimately reached by has to be listed. nginx forwards the
+        # client's Host verbatim, so these are the names an operator types:
+        allowed_hosts:
+            - 'monad-api.monad.internal'   # the intranet name — the supported route
+            - 'ccx33.monad.tailnet'        # MagicDNS name of the control host
+            - '100.64.0.1'                 # its tailnet address, used by the port-parity listener
+            - 'localhost'                  # inside the container, e.g. the HEALTHCHECK
+            - '127.0.0.1'
