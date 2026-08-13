@@ -35,6 +35,14 @@ if [ -n "${DATABASE_URL:-}" ]; then
     php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 fi
 
+# Bundle web assets — EasyAdmin's CSS/JS above all; without them /admin renders as unstyled HTML.
+#
+# Here rather than in the image for the same reason as the cache below: `assets:install` is a
+# console command, so it boots the kernel, and the kernel needs DATABASE_URL and the rest of the
+# runtime configuration that a build stage has no business knowing. Cheap and idempotent — it
+# copies each bundle's public/ directory into ours.
+php bin/console assets:install public --no-interaction
+
 # Warm the container cache against the *runtime* environment. The image build cannot do this: it
 # has no DATABASE_URL and no secrets, so a cache warmed at build time is warmed against the wrong
 # configuration.
