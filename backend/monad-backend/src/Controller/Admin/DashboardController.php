@@ -128,6 +128,17 @@ class DashboardController extends AbstractDashboardController
             );
         }
 
+        // Zero is the failure this page exists to catch, and it is the one the >20 check below
+        // would have sailed past: with no zones there is nothing for CoreLocation to monitor, so
+        // the app runs, reports itself healthy, and produces no witness events at all. Same for
+        // an empty `majors` — a region is identified by UUID *and* major, so an empty list leaves
+        // the UUID unusable.
+        if ($beaconCount === 0) {
+            $warnings[] = 'No beacon zones declared. The witness channel has nothing to monitor: the app will run and report healthy while producing no zone transitions.';
+        } elseif (($bundle['beacons']['majors'] ?? []) === []) {
+            $warnings[] = 'Beacon zones are declared but `majors` is empty. A CoreLocation region is identified by UUID and major together, so nothing would be monitored.';
+        }
+
         // iOS monitors at most 20 CoreLocation beacon regions per app, and the excess is not an
         // error — the regions past the limit are simply never delivered.
         if ($beaconCount > 20) {

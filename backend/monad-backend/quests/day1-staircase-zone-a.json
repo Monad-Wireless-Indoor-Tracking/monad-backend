@@ -1,0 +1,248 @@
+{
+  "name": "EXP-C1 · Day 1 · Staircase — ZONE-A",
+  "description": "Full staircase 0-1-2-3-4-6-8-10 in ZONE-A, seated and walking at each level, 175 s per sub-block. Three zones give the geometry axis inside one hall, which is what lifts the design from six folds to nine.",
+  "available_from": "2026-08-18T08:00:00+02:00",
+  "available_to": "2026-08-18T20:00:00+02:00",
+  "points": 0.0,
+  "estimated_duration": 55,
+  "required_capabilities": [],
+  "steps": [
+    {
+      "order": 0,
+      "name": "What you are part of",
+      "type": "start",
+      "config": {
+        "description": "The operator changes the number of people between sub-blocks; that change is the measurement. Keep the phone in a pocket, screen off, and stay inside the marked zone — 341 m² of hall is sparse for whole-room sensing, and the result depends on the links crossing a bounded group."
+      }
+    },
+    {
+      "order": 1,
+      "name": "Join the experiment AP",
+      "type": "connect_to_ap",
+      "config": {
+        "ap_id": "illum-24",
+        "description": "Associate and pin the socket before the first take."
+      }
+    },
+    {
+      "order": 2,
+      "name": "Check in",
+      "type": "scan_qr",
+      "config": {
+        "qr_code_id": "zone-a-in",
+        "expected_value": "MONAD-A-IN",
+        "description": "Counts you as a person and stamps the opening clock sample."
+      }
+    },
+    {
+      "order": 3,
+      "name": "ZONE-A · level 0 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 0,
+        "posture": "seated",
+        "arrangement_id": "a-l0-s",
+        "description": "Empty. Everyone steps outside the marked zone."
+      }
+    },
+    {
+      "order": 4,
+      "name": "ZONE-A · level 0 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 0,
+        "posture": "walking",
+        "arrangement_id": "a-l0-w",
+        "description": "Empty. Everyone steps outside the marked zone."
+      }
+    },
+    {
+      "order": 5,
+      "name": "ZONE-A · level 1 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 1,
+        "posture": "seated",
+        "arrangement_id": "a-l1-s",
+        "description": "1 person in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 6,
+      "name": "ZONE-A · level 1 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 1,
+        "posture": "walking",
+        "arrangement_id": "a-l1-w",
+        "description": "1 person in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 7,
+      "name": "ZONE-A · level 2 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 2,
+        "posture": "seated",
+        "arrangement_id": "a-l2-s",
+        "description": "2 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 8,
+      "name": "ZONE-A · level 2 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 2,
+        "posture": "walking",
+        "arrangement_id": "a-l2-w",
+        "description": "2 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 9,
+      "name": "ZONE-A · level 3 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 3,
+        "posture": "seated",
+        "arrangement_id": "a-l3-s",
+        "description": "3 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 10,
+      "name": "ZONE-A · level 3 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 3,
+        "posture": "walking",
+        "arrangement_id": "a-l3-w",
+        "description": "3 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 11,
+      "name": "ZONE-A · level 4 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 4,
+        "posture": "seated",
+        "arrangement_id": "a-l4-s",
+        "description": "4 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 12,
+      "name": "ZONE-A · level 4 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 4,
+        "posture": "walking",
+        "arrangement_id": "a-l4-w",
+        "description": "4 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 13,
+      "name": "ZONE-A · level 6 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 6,
+        "posture": "seated",
+        "arrangement_id": "a-l6-s",
+        "description": "6 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 14,
+      "name": "ZONE-A · level 6 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 6,
+        "posture": "walking",
+        "arrangement_id": "a-l6-w",
+        "description": "6 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 15,
+      "name": "ZONE-A · level 8 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 8,
+        "posture": "seated",
+        "arrangement_id": "a-l8-s",
+        "description": "8 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 16,
+      "name": "ZONE-A · level 8 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 8,
+        "posture": "walking",
+        "arrangement_id": "a-l8-w",
+        "description": "8 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 17,
+      "name": "ZONE-A · level 10 · seated",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 10,
+        "posture": "seated",
+        "arrangement_id": "a-l10-s",
+        "description": "10 people in the zone, seated and still. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 18,
+      "name": "ZONE-A · level 10 · walking",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 175,
+        "occupancy_count": 10,
+        "posture": "walking",
+        "arrangement_id": "a-l10-w",
+        "description": "10 people in the zone, walking at an ordinary pace. 175 s — the frozen sub-block length (29 windows)."
+      }
+    },
+    {
+      "order": 19,
+      "name": "Check out",
+      "type": "scan_qr",
+      "config": {
+        "qr_code_id": "zone-a-out",
+        "expected_value": "MONAD-A-OUT",
+        "description": "Closing clock sample, and the scan that lets the zone tally close."
+      }
+    },
+    {
+      "order": 20,
+      "name": "Zone complete",
+      "type": "finish",
+      "config": {
+        "description": "Sixteen sub-blocks recorded. This zone is one of the nine folds the power statement needs."
+      }
+    }
+  ]
+}

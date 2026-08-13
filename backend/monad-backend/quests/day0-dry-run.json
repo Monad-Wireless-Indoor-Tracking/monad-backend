@@ -1,0 +1,58 @@
+{
+  "name": "EXP-C1 · Day 0 · Dry run (no radio)",
+  "description": "Rehearse the participant flow end to end with no radio dependency. Discovers a broken truth channel on Day 0 rather than with ten people standing in the hall.",
+  "available_from": "2026-08-17T08:00:00+02:00",
+  "available_to": "2026-08-17T20:00:00+02:00",
+  "points": 0.0,
+  "estimated_duration": 5,
+  "required_capabilities": [],
+  "steps": [
+    {
+      "order": 0,
+      "name": "Rehearsal",
+      "type": "start",
+      "config": {
+        "description": "The whole participant flow with the radio left out, so the first time anyone reads these instructions is not the first time the hardware matters."
+      }
+    },
+    {
+      "order": 1,
+      "name": "Check in",
+      "type": "scan_qr",
+      "config": {
+        "qr_code_id": "zone-a-in",
+        "expected_value": "MONAD-A-IN",
+        "description": "The truth channel is a human act: it counts a person, not a phone."
+      }
+    },
+    {
+      "order": 2,
+      "name": "Hold",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 60,
+        "occupancy_count": 1,
+        "posture": "seated",
+        "description": "One minute seated so the flow has a middle."
+      }
+    },
+    {
+      "order": 3,
+      "name": "Check out",
+      "type": "scan_qr",
+      "config": {
+        "qr_code_id": "zone-a-out",
+        "expected_value": "MONAD-A-OUT",
+        "description": "Scanning out is what makes the zone tally close."
+      }
+    },
+    {
+      "order": 4,
+      "name": "Done",
+      "type": "finish",
+      "config": {
+        "description": "Nothing recorded here should be analysed. If the tally moved in the admin panel, the people channel works."
+      }
+    }
+  ]
+}

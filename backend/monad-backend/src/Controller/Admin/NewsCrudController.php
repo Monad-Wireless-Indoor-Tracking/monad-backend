@@ -11,7 +11,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use Doctrine\ORM\EntityManagerInterface;
 
 /** Announcements shown in the app. */
 class NewsCrudController extends AbstractCrudController
@@ -44,13 +43,17 @@ class NewsCrudController extends AbstractCrudController
         yield DateTimeField::new('createdAt', 'Created')->hideOnForm();
     }
 
-    /** Authorship is taken from the session rather than asked for — one less field to get wrong. */
-    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    /**
+     * Authorship is taken from the session rather than asked for — one less field to get wrong.
+     *
+     * In createEntity, not persistEntity: createdBy is Assert\NotNull on the entity, and
+     * persistEntity runs after validation has already failed the form.
+     */
+    public function createEntity(string $entityFqcn): News
     {
-        if ($entityInstance instanceof News && $entityInstance->getCreatedBy() === null) {
-            $entityInstance->setCreatedBy($this->getUser());
-        }
+        $news = new News();
+        $news->setCreatedBy($this->getUser());
 
-        parent::persistEntity($entityManager, $entityInstance);
+        return $news;
     }
 }

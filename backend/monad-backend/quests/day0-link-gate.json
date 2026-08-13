@@ -1,0 +1,80 @@
+{
+  "name": "EXP-C1 · Day 0 · Link and delivered-rate gate",
+  "description": "Paced illumination at 25/50/100/200 Hz against the experiment AP, to establish the rate the session can sustain. Abort criteria are pre-registered: delivered rate below floor, or illuminator silent.",
+  "available_from": "2026-08-17T08:00:00+02:00",
+  "available_to": "2026-08-17T20:00:00+02:00",
+  "points": 0.0,
+  "estimated_duration": 12,
+  "required_capabilities": [],
+  "steps": [
+    {
+      "order": 0,
+      "name": "The gate everything else depends on",
+      "type": "start",
+      "config": {
+        "description": "Doppler features are blocked by delivery jitter, not by rate: 0 of 500 windows passed the inter-arrival gate on the earlier captures. This exists to find that out on Day 0."
+      }
+    },
+    {
+      "order": 1,
+      "name": "Join the experiment AP",
+      "type": "connect_to_ap",
+      "config": {
+        "ap_id": "illum-24",
+        "description": "Associate, then pin the socket to that interface. An unpinned socket sends the sounding traffic over cellular, where no receiver can hear it."
+      }
+    },
+    {
+      "order": 2,
+      "name": "Ladder · 25 Hz",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 120,
+        "rate_hz": 25,
+        "posture": "seated",
+        "description": "Two minutes at 25 Hz. Pass condition: delivered rate at or above 100 Hz per link with inter-arrival CV below 0.5. Below the floor, stop and fix — every downstream feature reads this stream."
+      }
+    },
+    {
+      "order": 3,
+      "name": "Ladder · 50 Hz",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 120,
+        "rate_hz": 50,
+        "posture": "seated",
+        "description": "Two minutes at 50 Hz. Pass condition: delivered rate at or above 100 Hz per link with inter-arrival CV below 0.5. Below the floor, stop and fix — every downstream feature reads this stream."
+      }
+    },
+    {
+      "order": 4,
+      "name": "Ladder · 100 Hz",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 120,
+        "rate_hz": 100,
+        "posture": "seated",
+        "description": "Two minutes at 100 Hz. Pass condition: delivered rate at or above 100 Hz per link with inter-arrival CV below 0.5. Below the floor, stop and fix — every downstream feature reads this stream."
+      }
+    },
+    {
+      "order": 5,
+      "name": "Ladder · 200 Hz",
+      "type": "wait",
+      "config": {
+        "timeout_seconds": 120,
+        "rate_hz": 200,
+        "posture": "seated",
+        "description": "Two minutes at 200 Hz. Pass condition: delivered rate at or above 100 Hz per link with inter-arrival CV below 0.5. Below the floor, stop and fix — every downstream feature reads this stream."
+      }
+    },
+    {
+      "order": 6,
+      "name": "Read the ladder",
+      "type": "finish",
+      "config": {
+        "description": "The rung where delivery or CV breaks is the session's ceiling. Configure the staircase below it."
+      }
+    }
+  ]
+}

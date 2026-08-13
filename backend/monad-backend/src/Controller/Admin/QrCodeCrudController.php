@@ -3,7 +3,6 @@
 namespace App\Controller\Admin;
 
 use App\Entity\QrCode;
-use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
@@ -54,12 +53,17 @@ class QrCodeCrudController extends AbstractCrudController
         yield DateTimeField::new('createdAt', 'Created')->hideOnForm();
     }
 
-    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    /**
+     * Authorship comes from the session, and it belongs here rather than in persistEntity:
+     * createdBy is Assert\NotNull, and persistEntity runs after the validator has already
+     * rejected the form. Setting it on the instance the form is about to bind to is the only
+     * point early enough to count.
+     */
+    public function createEntity(string $entityFqcn): QrCode
     {
-        if ($entityInstance instanceof QrCode && $entityInstance->getCreatedBy() === null) {
-            $entityInstance->setCreatedBy($this->getUser());
-        }
+        $qrCode = new QrCode();
+        $qrCode->setCreatedBy($this->getUser());
 
-        parent::persistEntity($entityManager, $entityInstance);
+        return $qrCode;
     }
 }
