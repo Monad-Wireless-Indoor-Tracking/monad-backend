@@ -1,6 +1,6 @@
 {
   "name": "MONAD · 30-minute chain showcase",
-  "description": "One visit, three links: QR truth to the API, paced UDP to the collector on monad03, session upload with a clock fit. No access point required — none is currently broadcasting, so the lab console's collector override decides the destination and the instrument runs on the current network.",
+  "description": "One visit, three links: QR truth to the API, fleet capture through labelled blocks, and a session upload with a clock fit. Nothing to associate to and nothing to configure — start it and walk.",
   "available_from": "2026-08-13T12:00:00+02:00",
   "available_to": "2026-08-13T23:59:00+02:00",
   "points": 0.0,
@@ -9,10 +9,12 @@
   "steps": [
     {
       "order": 0,
-      "name": "What this half hour proves",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "A chain test, not a measurement. Nothing here is a result: the point is to prove that a scan reaches the API, that the phone's paced stream reaches the collector on monad03, and that the session uploads with a usable clock fit. Every later claim rests on those three links, and none of them has yet carried real data end to end."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "A chain test, not a measurement. Nothing here is a result: the point is to prove that a scan reaches the API, that the fleet's injected stream is being captured while the blocks are labelled, and that the session uploads with a usable clock fit.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
@@ -22,7 +24,7 @@
       "config": {
         "qr_code_id": "showcase-in",
         "expected_value": "MONAD-SHOWCASE-IN",
-        "description": "Stamps a wallclock and a monotonic timestamp at a known position. Two sync samples are the minimum the clock gate G4 accepts, so this scan and the closing one are not ceremony."
+        "description": "Stamps a wallclock and a monotonic timestamp. Two sync samples are the minimum the clock gate G4 accepts, so this scan and the closing one are not ceremony."
       }
     },
     {
@@ -33,7 +35,7 @@
         "timeout_seconds": 175,
         "occupancy_count": 0,
         "posture": "empty",
-        "description": "Leave the marked zone entirely. 175 s — the same sub-block length the session uses, so this take is comparable with next week's rather than a one-off."
+        "description": "Leave the marked zone entirely. 175 s — the frozen sub-block length, so this take is comparable with next week's rather than a one-off."
       }
     },
     {
@@ -44,7 +46,7 @@
         "timeout_seconds": 175,
         "occupancy_count": 1,
         "posture": "seated",
-        "description": "One person, seated, still, phone in a pocket. The still crowd is the condition that has never been measured on this hardware."
+        "description": "One person, seated, still. The still crowd is the condition that has never been measured on this hardware."
       }
     },
     {
@@ -55,7 +57,7 @@
         "timeout_seconds": 175,
         "occupancy_count": 1,
         "posture": "walking",
-        "description": "Same person, walking the zone at an ordinary pace. Seated-versus-walking at a fixed count is the cleanest contrast available in one visit."
+        "description": "Same person, walking a steady loop at an ordinary pace. Motion-versus-static at a fixed count is the cleanest contrast available in one visit."
       }
     },
     {
@@ -73,7 +75,7 @@
       "name": "Upload and check",
       "type": "finish",
       "config": {
-        "description": "Session uploads, then check three things: delivered rate at the collector, the clock gate on the status screen, and the tally at /admin/lab/sessions. If all three agree, the chain is real."
+        "description": "Check three things: that monad03 captured through the block, the clock gate on the status screen, and the tally at /admin/lab/sessions. If all three agree, the chain is real."
       }
     }
   ]

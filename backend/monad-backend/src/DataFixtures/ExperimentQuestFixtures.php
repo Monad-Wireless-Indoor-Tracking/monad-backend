@@ -49,6 +49,14 @@ class ExperimentQuestFixtures extends Fixture implements DependentFixtureInterfa
     /** Take length in seconds — IP-106 addendum A3. */
     private const TAKE_SECONDS = 30;
 
+    /**
+     * Block length for the walk-through ABBA contrast (EXP-LIB-02). Longer than
+     * TAKE_SECONDS on purpose: this block's estimand is a variance/Doppler contrast
+     * over a whole block, not a staged occupancy take, and 3 min x 12 blocks fits the
+     * 45 m `walk-abba` csid profile with slack.
+     */
+    private const WALK_BLOCK_SECONDS = 180;
+
     public static function getGroups(): array
     {
         return ['experiment'];
@@ -81,6 +89,7 @@ class ExperimentQuestFixtures extends Fixture implements DependentFixtureInterfa
         $manager->persist($this->uwbSurvey($author));
         $manager->persist($this->bleRecalibration($author));
         $manager->persist($this->dualBand($author));
+        $manager->persist($this->walkAbba($author));
         $manager->flush();
     }
 
@@ -552,6 +561,99 @@ class ExperimentQuestFixtures extends Fixture implements DependentFixtureInterfa
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /**
+     * EXP-LIB-02 — walk-through ABBA, the occupied arm paired with the EXP-LIB-01
+     * empty-library baseline (2026-08-12, 4.87 M records, 5 observers, 12 h).
+     *
+     * WHY THIS QUEST NAMES NO AP. Every other quest in this file carries
+     * `ap_id => 'exp-ap-5g'` and a CONNECT_TO_AP step. That design is dead: 5 GHz AP
+     * mode is impossible on this hardware (Intel LAR firmware limit — it crashes the
+     * iax backport), and the fleet moved to monitor-mode broadcast injection on
+     * 2.4 GHz ch11. There is nothing for the phone to associate to, so a
+     * CONNECT_TO_AP step here would block the run on an association that cannot
+     * happen. The phone is a WITNESS and a LABELLER in this quest, not an
+     * illuminator — the illumination is monad01 running `csid@illum-walk`.
+     *
+     * The pattern is a true ABBA (A B B A, three times) rather than a simple
+     * alternation: it balances any linear time trend across the two conditions, which
+     * matters because the radios have a measured ~30 min warm-up transient and the
+     * whole block is 36 min long. Analyse PER PAIR, not pooled.
+     *
+     * A = empty (operator outside the room), B = walking.
+     */
+    private function walkAbba(User $author): Quest
+    {
+        $quest = $this->newQuest(
+            $author,
+            'EXP-LIB-02 · Walk-through ABBA',
+            'One person walks an otherwise-empty library while the fleet watches. Paired with the '
+            . 'EXP-LIB-01 empty-night baseline, this is the first first-party motion-vs-static '
+            . 'contrast in the project. The phone marks block boundaries; it does not illuminate.',
+            points: 0.0,
+            minutes: 45,
+        );
+
+        $order = 0;
+        $quest->addStep($this->step($order++, QuestStepType::START, 'Briefing', [
+            // No ap_id ON PURPOSE — see the docblock. Monitor-mode injection has no AP.
+            'profile_id' => 'walk-abba',
+            'site_ref' => 'fiit/library',
+            'description' => "This is a measurement run, not a game.\n\n"
+                . 'The library is empty apart from you. When a block says WALK, walk a steady loop '
+                . 'through the space at an ordinary pace. When a block says EMPTY, leave the room '
+                . "and stay out of the doorway until it ends.\n\n"
+                . 'Do not change anything else between blocks — same route, same pace, same doors.',
+        ]));
+
+        $quest->addStep($this->step($order++, QuestStepType::SCAN_QR, 'Opening clock sync', [
+            'qr_code_id' => 'library-marker-a',
+            'expected_value' => 'MONAD-SYNC-LIB-A',
+            'description' => 'Scan the room marker. This stamps a device-side timestamp at a known '
+                . 'position, which is what makes the phone labels and the node CSI alignable '
+                . 'afterwards. Without it the blocks are unlabelled.',
+        ]));
+
+        // A B B A, three times — 12 blocks, 6 per condition, order-balanced.
+        $pattern = ['A', 'B', 'B', 'A', 'A', 'B', 'B', 'A', 'A', 'B', 'B', 'A'];
+        $emptyIdx = 0;
+        $walkIdx = 0;
+
+        foreach ($pattern as $i => $condition) {
+            $isWalk = $condition === 'B';
+            $label = $isWalk ? ++$walkIdx : ++$emptyIdx;
+
+            $quest->addStep($this->step(
+                $order++,
+                QuestStepType::WAIT,
+                sprintf('%s — block %d of 12', $isWalk ? 'WALK' : 'EMPTY', $i + 1),
+                [
+                    'timeout_seconds' => self::WALK_BLOCK_SECONDS,
+                    'occupancy_count' => $isWalk ? 1 : 0,
+                    'arrangement_id' => sprintf('%s-%02d', $isWalk ? 'walk' : 'empty', $label),
+                    'posture' => $isWalk ? 'walking' : 'empty',
+                    'description' => $isWalk
+                        ? 'Walk a steady loop through the space for three minutes. Ordinary pace, '
+                            . 'no pauses, do not stand still next to a node.'
+                        : 'Leave the room and close the door. Stay clear of the doorway until the '
+                            . 'block ends — a person in the doorway is not an empty room.',
+                ]
+            ));
+        }
+
+        $quest->addStep($this->step($order++, QuestStepType::SCAN_QR, 'Closing clock sync', [
+            'qr_code_id' => 'library-marker-a',
+            'expected_value' => 'MONAD-SYNC-LIB-A',
+            'description' => 'Scan the same marker again. Two sync points bracket the run, so clock '
+                . 'drift over the session is measurable rather than assumed.',
+        ]));
+
+        $quest->addStep($this->step($order, QuestStepType::FINISH, 'Session complete', [
+            'description' => 'Walk-through contrast recorded. The occupied arm of the EXP-LIB-01 pair.',
+        ]));
+
+        return $quest;
+    }
 
     private function resolveAuthor(ObjectManager $manager): User
     {

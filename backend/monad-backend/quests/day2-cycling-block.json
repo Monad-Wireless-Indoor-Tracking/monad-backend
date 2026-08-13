@@ -9,100 +9,93 @@
   "steps": [
     {
       "order": 0,
-      "name": "Level versus change",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "The staircase measures level; this measures the transition. Returning to the same level (0 to 4 to 0) makes a matched up-ramp and down-ramp pair, which is what the peak-to-plateau contrast is estimated on."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "The staircase measures level; this measures the transition. Returning to the same level (0 to 4 to 0) makes a matched up-ramp and down-ramp pair, which is what the peak-to-plateau contrast is estimated on.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
       "order": 1,
-      "name": "Join the experiment AP",
-      "type": "connect_to_ap",
+      "name": "Plateau · level 0",
+      "type": "wait",
       "config": {
-        "ap_id": "illum-24",
-        "description": "Associate and pin."
+        "timeout_seconds": 90,
+        "occupancy_count": 0,
+        "posture": "seated",
+        "description": "Ninety seconds held at level 0."
       }
     },
     {
       "order": 2,
-      "name": "Plateau · level 0",
+      "name": "Ramp to 4",
       "type": "wait",
       "config": {
-        "timeout_seconds": 90,
-        "occupancy_count": 0,
-        "posture": "seated",
-        "description": "Ninety seconds held at level 0."
+        "timeout_seconds": 30,
+        "posture": "walking",
+        "occupancy_count": 4,
+        "description": "Four participants move. The movement is the event, not the noise."
       }
     },
     {
       "order": 3,
-      "name": "Ramp to 4",
+      "name": "Plateau · level 4",
       "type": "wait",
       "config": {
-        "timeout_seconds": 30,
-        "posture": "walking",
+        "timeout_seconds": 90,
         "occupancy_count": 4,
-        "description": "Four participants move. The movement is the event, not the noise."
+        "posture": "seated",
+        "description": "Ninety seconds held at level 4."
       }
     },
     {
       "order": 4,
-      "name": "Plateau · level 4",
+      "name": "Ramp to 0",
       "type": "wait",
       "config": {
-        "timeout_seconds": 90,
-        "occupancy_count": 4,
-        "posture": "seated",
-        "description": "Ninety seconds held at level 4."
+        "timeout_seconds": 30,
+        "posture": "walking",
+        "occupancy_count": 0,
+        "description": "Four participants move. The movement is the event, not the noise."
       }
     },
     {
       "order": 5,
-      "name": "Ramp to 0",
+      "name": "Plateau · level 0",
       "type": "wait",
       "config": {
-        "timeout_seconds": 30,
-        "posture": "walking",
+        "timeout_seconds": 90,
         "occupancy_count": 0,
-        "description": "Four participants move. The movement is the event, not the noise."
+        "posture": "seated",
+        "description": "Ninety seconds held at level 0."
       }
     },
     {
       "order": 6,
-      "name": "Plateau · level 0",
+      "name": "Ramp to 4",
       "type": "wait",
       "config": {
-        "timeout_seconds": 90,
-        "occupancy_count": 0,
-        "posture": "seated",
-        "description": "Ninety seconds held at level 0."
+        "timeout_seconds": 30,
+        "posture": "walking",
+        "occupancy_count": 4,
+        "description": "Four participants move. The movement is the event, not the noise."
       }
     },
     {
       "order": 7,
-      "name": "Ramp to 4",
+      "name": "Plateau · level 4",
       "type": "wait",
       "config": {
-        "timeout_seconds": 30,
-        "posture": "walking",
+        "timeout_seconds": 90,
         "occupancy_count": 4,
-        "description": "Four participants move. The movement is the event, not the noise."
+        "posture": "seated",
+        "description": "Ninety seconds held at level 4."
       }
     },
     {
       "order": 8,
-      "name": "Plateau · level 4",
-      "type": "wait",
-      "config": {
-        "timeout_seconds": 90,
-        "occupancy_count": 4,
-        "posture": "seated",
-        "description": "Ninety seconds held at level 4."
-      }
-    },
-    {
-      "order": 9,
       "name": "Ramp to 0",
       "type": "wait",
       "config": {
@@ -113,7 +106,7 @@
       }
     },
     {
-      "order": 10,
+      "order": 9,
       "name": "Plateau · level 0",
       "type": "wait",
       "config": {
@@ -124,7 +117,7 @@
       }
     },
     {
-      "order": 11,
+      "order": 10,
       "name": "Ramp to 4",
       "type": "wait",
       "config": {
@@ -135,7 +128,7 @@
       }
     },
     {
-      "order": 12,
+      "order": 11,
       "name": "Plateau · level 4",
       "type": "wait",
       "config": {
@@ -146,7 +139,7 @@
       }
     },
     {
-      "order": 13,
+      "order": 12,
       "name": "Ramp to 0",
       "type": "wait",
       "config": {
@@ -157,7 +150,7 @@
       }
     },
     {
-      "order": 14,
+      "order": 13,
       "name": "Plateau · level 0",
       "type": "wait",
       "config": {
@@ -168,7 +161,7 @@
       }
     },
     {
-      "order": 15,
+      "order": 14,
       "name": "Cycling block complete",
       "type": "finish",
       "config": {

@@ -1,6 +1,6 @@
 {
   "name": "EXP-C1 · Day 1 · Staircase — ZONE-C",
-  "description": "Full staircase 0-1-2-3-4-6-8-10 in ZONE-C, seated and walking at each level, 175 s per sub-block. Three zones give the geometry axis inside one hall, which is what lifts the design from six folds to nine.",
+  "description": "Full staircase 0-1-2-3-4-6-8-10 in ZONE-C, seated and walking at each level, 175 s per sub-block. Three zones give the geometry axis inside one hall, which lifts the design from six folds to nine.",
   "available_from": "2026-08-18T08:00:00+02:00",
   "available_to": "2026-08-18T20:00:00+02:00",
   "points": 0.0,
@@ -9,23 +9,16 @@
   "steps": [
     {
       "order": 0,
-      "name": "What you are part of",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "The operator changes the number of people between sub-blocks; that change is the measurement. Keep the phone in a pocket, screen off, and stay inside the marked zone — 341 m² of hall is sparse for whole-room sensing, and the result depends on the links crossing a bounded group."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "The operator changes the number of people between sub-blocks; that change is the measurement. Keep the phone in a pocket, screen off, and stay inside the marked zone — 341 m² of hall is sparse for whole-room sensing, and the result depends on the links crossing a bounded group.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
       "order": 1,
-      "name": "Join the experiment AP",
-      "type": "connect_to_ap",
-      "config": {
-        "ap_id": "illum-24",
-        "description": "Associate and pin the socket before the first take."
-      }
-    },
-    {
-      "order": 2,
       "name": "Check in",
       "type": "scan_qr",
       "config": {
@@ -35,7 +28,7 @@
       }
     },
     {
-      "order": 3,
+      "order": 2,
       "name": "ZONE-C · level 0 · seated",
       "type": "wait",
       "config": {
@@ -47,7 +40,7 @@
       }
     },
     {
-      "order": 4,
+      "order": 3,
       "name": "ZONE-C · level 0 · walking",
       "type": "wait",
       "config": {
@@ -59,7 +52,7 @@
       }
     },
     {
-      "order": 5,
+      "order": 4,
       "name": "ZONE-C · level 1 · seated",
       "type": "wait",
       "config": {
@@ -71,7 +64,7 @@
       }
     },
     {
-      "order": 6,
+      "order": 5,
       "name": "ZONE-C · level 1 · walking",
       "type": "wait",
       "config": {
@@ -83,7 +76,7 @@
       }
     },
     {
-      "order": 7,
+      "order": 6,
       "name": "ZONE-C · level 2 · seated",
       "type": "wait",
       "config": {
@@ -95,7 +88,7 @@
       }
     },
     {
-      "order": 8,
+      "order": 7,
       "name": "ZONE-C · level 2 · walking",
       "type": "wait",
       "config": {
@@ -107,7 +100,7 @@
       }
     },
     {
-      "order": 9,
+      "order": 8,
       "name": "ZONE-C · level 3 · seated",
       "type": "wait",
       "config": {
@@ -119,7 +112,7 @@
       }
     },
     {
-      "order": 10,
+      "order": 9,
       "name": "ZONE-C · level 3 · walking",
       "type": "wait",
       "config": {
@@ -131,7 +124,7 @@
       }
     },
     {
-      "order": 11,
+      "order": 10,
       "name": "ZONE-C · level 4 · seated",
       "type": "wait",
       "config": {
@@ -143,7 +136,7 @@
       }
     },
     {
-      "order": 12,
+      "order": 11,
       "name": "ZONE-C · level 4 · walking",
       "type": "wait",
       "config": {
@@ -155,7 +148,7 @@
       }
     },
     {
-      "order": 13,
+      "order": 12,
       "name": "ZONE-C · level 6 · seated",
       "type": "wait",
       "config": {
@@ -167,7 +160,7 @@
       }
     },
     {
-      "order": 14,
+      "order": 13,
       "name": "ZONE-C · level 6 · walking",
       "type": "wait",
       "config": {
@@ -179,7 +172,7 @@
       }
     },
     {
-      "order": 15,
+      "order": 14,
       "name": "ZONE-C · level 8 · seated",
       "type": "wait",
       "config": {
@@ -191,7 +184,7 @@
       }
     },
     {
-      "order": 16,
+      "order": 15,
       "name": "ZONE-C · level 8 · walking",
       "type": "wait",
       "config": {
@@ -203,7 +196,7 @@
       }
     },
     {
-      "order": 17,
+      "order": 16,
       "name": "ZONE-C · level 10 · seated",
       "type": "wait",
       "config": {
@@ -215,7 +208,7 @@
       }
     },
     {
-      "order": 18,
+      "order": 17,
       "name": "ZONE-C · level 10 · walking",
       "type": "wait",
       "config": {
@@ -227,7 +220,7 @@
       }
     },
     {
-      "order": 19,
+      "order": 18,
       "name": "Check out",
       "type": "scan_qr",
       "config": {
@@ -237,7 +230,7 @@
       }
     },
     {
-      "order": 20,
+      "order": 19,
       "name": "Zone complete",
       "type": "finish",
       "config": {

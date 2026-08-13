@@ -1,6 +1,6 @@
 {
   "name": "EXP-C1 · Day 0 · Empty-room baseline (per zone)",
-  "description": "Thirty minutes of empty hall per zone per band. This is what every later take is measured against.",
+  "description": "Thirty minutes of empty hall per zone. This is what every later take is measured against.",
   "available_from": "2026-08-17T08:00:00+02:00",
   "available_to": "2026-08-17T20:00:00+02:00",
   "points": 0.0,
@@ -9,23 +9,16 @@
   "steps": [
     {
       "order": 0,
-      "name": "Estimator input, not filler",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "The noise floor, the structural-variance fit and the trigger calibration all read this block. One warning from the probe: never calibrate the drift trigger on empty-room data alone — all four missed splice detections shared an empty-room-calibrated source."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "The noise floor, the structural-variance fit and the trigger calibration all read this block. One warning from the probe: never calibrate the drift trigger on empty-room data alone — all four missed splice detections shared an empty-room-calibrated source.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
       "order": 1,
-      "name": "Join the experiment AP",
-      "type": "connect_to_ap",
-      "config": {
-        "ap_id": "illum-24",
-        "description": "Associate and pin before the baseline begins."
-      }
-    },
-    {
-      "order": 2,
       "name": "Empty hall",
       "type": "wait",
       "config": {
@@ -36,11 +29,11 @@
       }
     },
     {
-      "order": 3,
+      "order": 2,
       "name": "Baseline recorded",
       "type": "finish",
       "config": {
-        "description": "Repeat per zone and per band before any staged block runs."
+        "description": "Repeat per zone before any staged block."
       }
     }
   ]

@@ -1,6 +1,6 @@
 {
   "name": "EXP-C1 · Day 2 · Reduced staircase + induced drift",
-  "description": "Levels 0-2-4-8 at 350 s per sub-block on a different day, with a controlled furniture move between blocks. Builds the leave-one-session-out axis and the only real drift the trigger will ever see.",
+  "description": "Levels 0-2-4-8 at 350 s per sub-block on a different day, with a controlled furniture move between blocks. Builds the leave-one-session-out axis and the only real drift the trigger sees.",
   "available_from": "2026-08-19T08:00:00+02:00",
   "available_to": "2026-08-19T20:00:00+02:00",
   "points": 0.0,
@@ -9,23 +9,16 @@
   "steps": [
     {
       "order": 0,
-      "name": "The second session",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "Reduced density, longer sub-blocks. Its purpose is to be a different day: the leave-one-session-out axis needs a second session, not more of the first."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "Reduced density, longer sub-blocks. Its purpose is to be a different day: the leave-one-session-out axis needs a second session, not more of the first.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
       "order": 1,
-      "name": "Join the experiment AP",
-      "type": "connect_to_ap",
-      "config": {
-        "ap_id": "illum-24",
-        "description": "Associate and pin."
-      }
-    },
-    {
-      "order": 2,
       "name": "Check in",
       "type": "scan_qr",
       "config": {
@@ -35,7 +28,7 @@
       }
     },
     {
-      "order": 3,
+      "order": 2,
       "name": "Level 0 · seated",
       "type": "wait",
       "config": {
@@ -47,7 +40,7 @@
       }
     },
     {
-      "order": 4,
+      "order": 3,
       "name": "Level 0 · walking",
       "type": "wait",
       "config": {
@@ -59,7 +52,7 @@
       }
     },
     {
-      "order": 5,
+      "order": 4,
       "name": "Level 2 · seated",
       "type": "wait",
       "config": {
@@ -71,7 +64,7 @@
       }
     },
     {
-      "order": 6,
+      "order": 5,
       "name": "Level 2 · walking",
       "type": "wait",
       "config": {
@@ -83,7 +76,7 @@
       }
     },
     {
-      "order": 7,
+      "order": 6,
       "name": "Level 4 · seated",
       "type": "wait",
       "config": {
@@ -95,7 +88,7 @@
       }
     },
     {
-      "order": 8,
+      "order": 7,
       "name": "Level 4 · walking",
       "type": "wait",
       "config": {
@@ -107,7 +100,7 @@
       }
     },
     {
-      "order": 9,
+      "order": 8,
       "name": "Level 8 · seated",
       "type": "wait",
       "config": {
@@ -119,7 +112,7 @@
       }
     },
     {
-      "order": 10,
+      "order": 9,
       "name": "Level 8 · walking",
       "type": "wait",
       "config": {
@@ -131,7 +124,7 @@
       }
     },
     {
-      "order": 11,
+      "order": 10,
       "name": "Check out",
       "type": "scan_qr",
       "config": {
@@ -141,7 +134,7 @@
       }
     },
     {
-      "order": 12,
+      "order": 11,
       "name": "Second session recorded",
       "type": "finish",
       "config": {

@@ -9,10 +9,12 @@
   "steps": [
     {
       "order": 0,
-      "name": "Rehearsal",
+      "name": "Briefing",
       "type": "start",
       "config": {
-        "description": "The whole participant flow with the radio left out, so the first time anyone reads these instructions is not the first time the hardware matters."
+        "profile_id": "illum-walk",
+        "site_ref": "fiit/library",
+        "description": "The whole participant flow with the radio left out, so the first time anyone reads these instructions is not the first time the hardware matters.\n\nThe phone does not illuminate — it marks block boundaries and carries the truth channel. Illumination is monad01 injecting on 2.4 GHz ch11."
       }
     },
     {
@@ -51,7 +53,7 @@
       "name": "Done",
       "type": "finish",
       "config": {
-        "description": "Nothing recorded here should be analysed. If the tally moved in the admin panel, the people channel works."
+        "description": "If the tally moved in the admin panel, the people channel works."
       }
     }
   ]
