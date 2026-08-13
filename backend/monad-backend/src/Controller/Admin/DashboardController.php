@@ -14,6 +14,7 @@ use App\Entity\QuestStepSkipRecord;
 use App\Entity\User;
 use App\Service\GroundTruthService;
 use App\Service\LabConfigService;
+use App\Service\MarkerService;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
@@ -82,6 +83,18 @@ class DashboardController extends AbstractDashboardController
             'recent_scans' => $this->entityManager->getRepository(GroundTruthScan::class)
                 ->findBy(['labSessionId' => $labSessionId], ['receivedAt' => 'DESC'], 50),
         ]);
+    }
+
+    /**
+     * The printable marker sheet.
+     *
+     * Derived from the quests rather than kept as files: the codes and the strings the app matches
+     * cannot drift apart if one is generated from the other.
+     */
+    #[AdminRoute(path: '/lab/markers', name: 'lab_markers')]
+    public function labMarkers(MarkerService $markers): Response
+    {
+        return $this->render('admin/markers.html.twig', ['markers' => $markers->markers()]);
     }
 
     /**
@@ -174,6 +187,7 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToRoute('Lab sessions', 'fa fa-satellite-dish', 'admin_lab_sessions');
         yield MenuItem::linkToCrud('Ground-truth scans', 'fa fa-qrcode', GroundTruthScan::class);
         yield MenuItem::linkToCrud('Scan conflicts (E3)', 'fa fa-triangle-exclamation', GroundTruthConflict::class);
+        yield MenuItem::linkToRoute('Scan markers', 'fa fa-qrcode', 'admin_lab_markers');
         yield MenuItem::linkToRoute('Lab bundle', 'fa fa-sliders', 'admin_lab_bundle');
 
         yield MenuItem::section('People');

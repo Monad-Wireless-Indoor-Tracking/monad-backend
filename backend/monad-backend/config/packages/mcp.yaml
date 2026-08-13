@@ -1,0 +1,36 @@
+# MCP server — the authoring surface for lab content.
+#
+# Quest definitions used to be JSON files baked into the image, which meant changing what a
+# participant is told required a rebuild, a registry push and an Ansible run. Session content
+# changes between sessions; the deployment artefact should not. So the definitions live in the
+# database and this is how they are written.
+#
+# HTTP transport, not stdio: the server that owns the data runs in a container on the project
+# host, and stdio would mean a shell into it. The endpoint is reachable exactly like /admin —
+# tailnet only, nginx refuses it on the public vhost — and authenticated with an ordinary account
+# over HTTP Basic (see the `mcp` firewall in security.yaml). One credential story for the whole
+# backend: the account that signs into the panel is the account that authors over MCP.
+mcp:
+    app: 'monad-lab'
+    version: '1.0.0'
+    description: 'Lab content authoring for MonadCount: quests, scan markers, session tallies.'
+    instructions: |
+        This server authors the content of a running measurement lab.
+
+        Quests are participant scripts. A quest is a sequence of steps; the step types are
+        start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture, finish.
+
+        Two facts about this deployment that change what is valid:
+
+        1. There is no access point. AP mode is impossible on the fleet's AX210 (the Intel LAR
+           firmware limit crashes the iax backport), so illumination is monitor-mode injection
+           on 2.4 GHz ch11 and there is nothing for a phone to associate to. A connect_to_ap
+           step blocks the run on an association that cannot happen — do not author one.
+        2. A scan_qr step is matched by string. The app compares the scanned text to the step's
+           `expected_value` (case-insensitive) and nothing consults a table, so the marker a
+           participant scans must carry exactly that string. Render it with lab_marker_svg.
+
+    client_transports:
+        http: true
+    http:
+        path: '/mcp'

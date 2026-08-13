@@ -28,6 +28,15 @@ security:
             pattern: ^/api
             stateless: true
             jwt: ~
+        # The MCP authoring surface. HTTP Basic rather than JWT: an MCP client configures a
+        # username and a password once, and there is no token to refresh mid-session. Stateless,
+        # because each JSON-RPC call stands alone.
+        mcp:
+            pattern: ^/mcp
+            stateless: true
+            http_basic:
+                realm: 'MonadCount lab'
+
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
@@ -75,6 +84,10 @@ security:
         # management interface would otherwise be open to anyone who signed up in the app.
         - { path: ^/admin/login, roles: PUBLIC_ACCESS }
         - { path: ^/admin, roles: ROLE_SUPERADMIN }
+
+        # Authoring lab content is an administrative act, so it takes the same role the panel
+        # does. Like /admin, nginx serves this on the tailnet only.
+        - { path: ^/mcp, roles: ROLE_SUPERADMIN }
 
         # Liveness must not require a token: the container HEALTHCHECK, the host nginx upstream
         # probe and any uptime monitor all call it unauthenticated, and a 401 reads as "down".
