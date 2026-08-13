@@ -31,6 +31,28 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+
+        # The management interface. Stateful on purpose, unlike everything above it: the API is
+        # JWT-bearer because phones hold their own token, but a browser session is what a human
+        # operator has, and storing a JWT in localStorage to fake one would be a downgrade.
+        # Session cookies also mean the logout below actually ends the session server-side.
+        #
+        # Reachability is narrowed a second time outside the application: nginx serves /admin only
+        # to the Headscale tailnet (roles/monad_api). Login is the authentication; the tailnet is
+        # the reason a credential-stuffing bot never reaches the login at all.
+        admin:
+            pattern: ^/admin
+            lazy: true
+            provider: app_user_provider
+            form_login:
+                login_path: admin_login
+                check_path: admin_login
+                default_target_path: admin
+                enable_csrf: true
+            logout:
+                path: admin_logout
+                target: admin_login
+
         main:
             lazy: true
             provider: app_user_provider
@@ -48,6 +70,12 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
+        # The login form itself must be reachable by someone not yet logged in; everything else
+        # under /admin is superadmin-only. ROLE_USER is every registered participant, so the
+        # management interface would otherwise be open to anyone who signed up in the app.
+        - { path: ^/admin/login, roles: PUBLIC_ACCESS }
+        - { path: ^/admin, roles: ROLE_SUPERADMIN }
+
         # Liveness must not require a token: the container HEALTHCHECK, the host nginx upstream
         # probe and any uptime monitor all call it unauthenticated, and a 401 reads as "down".
         - { path: ^/api/health, roles: PUBLIC_ACCESS }

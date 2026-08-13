@@ -78,6 +78,14 @@ RUN printf 'APP_ENV=prod\nAPP_DEBUG=0\n' > .env
 
 RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
+# Bundle assets — EasyAdmin's CSS/JS, and API Platform's and NelmioApiDoc's.
+#
+# `composer install` above runs with --no-scripts, so the auto-scripts hook that would normally
+# call this never fires; and /public/bundles/ is gitignored, so the COPY brought nothing either.
+# Without this line the management interface renders as unstyled HTML in production while working
+# perfectly on a developer's machine, where composer did run the scripts.
+RUN php bin/console assets:install public --no-interaction
+
 # var/ must be writable by the server and must not carry a build-time cache generated against
 # different environment values.
 RUN rm -rf var/cache/* var/log/* \

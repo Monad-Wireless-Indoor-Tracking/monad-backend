@@ -3,6 +3,12 @@
 # Differences from the development compose in this repo:
 #   * joins the external `monad` network, so the API sits alongside the rest of the lab's
 #     services and can be reached by name from them;
+#   * NO database of its own. The host runs exactly one PostgreSQL cluster — the main stack's
+#     PostGIS/pgRouting service — and this deployment is a tenant in it, with its own database
+#     and its own role. A second cluster on the same box was a second thing to back up, patch
+#     and size for no benefit, since the API needs no PostGIS and the GIS store needs no API.
+#     The database and role are created by roles/monad_api (tasks/database.yml), not here;
+#     compose cannot create a database inside a service it does not own.
 #   * binds only to loopback — TLS termination is the host nginx that already serves
 #     monad.dubec.dev, so there is exactly one certificate and one vhost story;
 #   * no source bind-mount and no `composer install` at boot: the image is the artefact;
@@ -12,25 +18,6 @@
 # without rebuilding or restarting anything the phones depend on.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: monad_api_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - monad
-    healthcheck:
-      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-      interval: 10s
-
   api:
     image: ${MONAD_API_IMAGE:-ghcr.io/monad-wireless-indoor-tracking/monad-backend:main}
     container_name: monad_api
@@ -38,7 +25,15 @@ services:
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      # Points at the main stack's cluster over the shared network, so the host is a variable
+      # rather than a sibling service name. serverVersion follows that cluster (PostgreSQL 18
+      # under pgrouting/pgrouting:18-x), not this repo's dev compose.
+      #
+      # DATABASE_* and not POSTGRES_PORT: the development compose in this repo already uses
+      # POSTGRES_PORT for the port it PUBLISHES on the host (55432), and compose reads .env
+      # from the project directory for whichever file it is given. Reusing the name silently
+      # produced postgis:55432 here.
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DATABASE_HOST:-postgis}:${DATABASE_PORT:-5432}/${POSTGRES_DB}?serverVersion=${DATABASE_SERVER_VERSION:-18}&charset=utf8"
       JWT_SECRET_KEY: /app/config/jwt/private.pem
       JWT_PUBLIC_KEY: /app/config/jwt/public.pem
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
@@ -63,12 +58,11 @@ services:
       - ./backend/monad-backend/config/lab/lab.json:/app/config/lab/lab.json:ro
     networks:
       - monad
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # No depends_on: the database belongs to another compose project, so compose cannot order
+    # against it. docker/entrypoint.sh already polls the DSN for 60s before migrating, which is
+    # the check that has to exist anyway for a bare `docker run`.
 
 volumes:
-  postgres_data:
   jwt_keys:
 
 networks:

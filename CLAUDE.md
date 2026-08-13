@@ -1,10 +1,17 @@
 # Monad backend
 
-API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL 16.
+API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL.
 
 - **Deployment**: `api.monad.dubec.dev` — project host (Hetzner CCX33), behind the host nginx that
   already terminates TLS for `monad.dubec.dev`. Container binds loopback only; see
   `docker-compose.deploy.yml`.
+- **Database**: the deployment ships **no database of its own**. The host runs exactly one
+  PostgreSQL cluster — the main stack's PostGIS/pgRouting service (PG 18) — and the API is a
+  tenant in it: its own `monad_db`, its own `monad_user` role, no PostGIS extension, no access to
+  `monad_gis`. The role and database are created by `roles/monad_api` (`tasks/database.yml`)
+  before the container starts, since the entrypoint migrates on boot. The development compose in
+  this repo is unaffected and still runs a throwaway `postgres:16-alpine` on 55432 — local work
+  needs nothing else running.
 - **Storage**: Hetzner Object Storage via `async-aws/s3` (no AWS SDK, no AWS anything), the project's bucket — the same tenancy as
   the `csid` fleet CSI captures and the simulation artefacts. Configured by `HETZNER_S3_ENDPOINT` +
   `HETZNER_S3_USE_PATH_STYLE`; Hetzner has no wildcard certificate, so path-style addressing is required.
@@ -22,6 +29,30 @@ API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL 16.
 | `POST /api/lab/ground-truth` | Ground-truth check-in/out scans from participant devices, single or batched. Idempotent on `scan_nonce`. |
 | `GET /api/lab/ground-truth/{labSessionId}` | Live room-wide people tally for one session, per zone and overall. Cheap to poll. |
 | `/api/auth/*`, `/api/quest*` | Accounts and the quest schedule engine. |
+
+## Management interface (`/admin`)
+
+EasyAdmin, session-authenticated, `ROLE_SUPERADMIN` only — and **not published to the internet**:
+the public vhost 404s `/admin`, and the surface is reachable over the tailnet at
+`http://monad-api.monad.internal:8084/admin` (`intranet_services` in the monad-knowledge inventory).
+Being on the VPN is the first gate, signing in is the second.
+
+Accounts come from the console, never from an endpoint — `/api/auth/register` can only mint
+`ROLE_USER`, because an endpoint that could grant `ROLE_SUPERADMIN` would be a privilege-escalation
+surface open to the world:
+
+```bash
+docker exec -it monad_api php bin/console app:user:create you@stuba.sk --admin
+```
+
+What is editable is a deliberate line, not an oversight:
+
+| Section | Write access |
+|---|---|
+| Ground-truth scans, conflicts, step completions, skip records | **none** — device-reported measurement. A scan is never overwritten and a conflict is never reconciled (E3); an admin screen that could "fix" a row would make both unenforceable, invisibly, months before anyone reads the data. |
+| Lab bundle | **read-only** — Ansible renders it and bind-mounts it read-only, so an edit here would be reverted by the next run while appearing to have worked. |
+| Users | edit + anonymise. No hard delete: `softDelete()` scrubs identity in place and leaves the pseudonymous scans countable. Passwords are write-only and blank means "keep". |
+| Quests, steps, enrollments, News, QR codes | full CRUD. Step `config` is edited as raw JSON (`App\Form\JsonType`) and invalid JSON fails the form — a malformed config surfaces on a participant's phone as a step that does nothing. |
 
 ## Ground truth (the people channel)
 

@@ -1,0 +1,43 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}Lab sessions{% endblock %}
+
+{% block main %}
+    <p class="text-muted">
+        A lab session is whatever <code>lab_session_id</code> the handsets were told to stamp; it comes
+        into existence when its first scan arrives. There is no session table to create a row in.
+    </p>
+
+    {% if sessions is empty %}
+        <p class="text-muted">No sessions yet.</p>
+    {% else %}
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Lab session</th>
+                            <th class="text-end">Scans</th>
+                            <th class="text-end">Participants</th>
+                            <th>Last scan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                            <tr>
+                                <td>
+                                    <a href="{{ path('admin_lab_session', {labSessionId: session.lab_session_id}) }}">
+                                        <code>{{ session.lab_session_id }}</code>
+                                    </a>
+                                </td>
+                                <td class="text-end">{{ session.scans }}</td>
+                                <td class="text-end">{{ session.participants }}</td>
+                                <td>{{ session.last_seen ? session.last_seen|date('Y-m-d H:i:s') : '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

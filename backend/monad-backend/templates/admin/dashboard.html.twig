@@ -1,0 +1,68 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{# Numbers an operator can act on, then the sessions themselves. Deliberately not a chart wall:
+   every count here answers a question someone actually asks mid-session. #}
+
+{% block content_title %}Overview{% endblock %}
+
+{% block main %}
+    <div class="row">
+        {% set tiles = [
+            {label: 'Users',        value: counts.users,       hint: counts.admins ~ ' admin' ~ (counts.admins == 1 ? '' : 's')},
+            {label: 'Quests',       value: counts.quests,      hint: counts.enrollments ~ ' enrollment' ~ (counts.enrollments == 1 ? '' : 's')},
+            {label: 'Scans',        value: counts.scans,       hint: 'ground truth, all sessions'},
+            {label: 'Conflicts',    value: counts.conflicts,   hint: 'exclusion E3'},
+        ] %}
+        {% for tile in tiles %}
+            <div class="col-md-3 col-sm-6">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">{{ tile.label }}</div>
+                        <div class="fs-2 fw-semibold {{ tile.label == 'Conflicts' and tile.value > 0 ? 'text-danger' : '' }}">{{ tile.value }}</div>
+                        <div class="text-muted small">{{ tile.hint }}</div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">Recent lab sessions</div>
+        <div class="card-body p-0">
+            {% if recent_sessions is empty %}
+                <p class="text-muted p-3 mb-0">
+                    No ground truth yet. A session appears here when the first check-in scan arrives —
+                    a session nobody scanned into produced no ground truth, which is the correct reading
+                    rather than a missing row.
+                </p>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Lab session</th>
+                                <th class="text-end">Scans</th>
+                                <th class="text-end">Participants</th>
+                                <th>Last scan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in recent_sessions %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ path('admin_lab_session', {labSessionId: session.lab_session_id}) }}">
+                                            <code>{{ session.lab_session_id }}</code>
+                                        </a>
+                                    </td>
+                                    <td class="text-end">{{ session.scans }}</td>
+                                    <td class="text-end">{{ session.participants }}</td>
+                                    <td>{{ session.last_seen ? session.last_seen|date('Y-m-d H:i:s') : '—' }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
