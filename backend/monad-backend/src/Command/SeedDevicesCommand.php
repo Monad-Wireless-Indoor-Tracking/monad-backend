@@ -26,8 +26,16 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * on a populated database and safe to run twice.
  *
  * The TOML is parsed by hand rather than by pulling in a parser dependency: the
- * needed subset is `[[nodes]] host = "..."`, which is one regex, and this is a
- * one-shot operator command rather than a hot path.
+ * needed subset is the `slug` of each `[[items]]` table, and this is a one-shot
+ * operator command rather than a hot path.
+ *
+ * The registry schema changed on 2026-08-14 when the label tooling became
+ * kind-parameterised: `[[nodes]] host = "monadNN"` became `[[items]] slug =
+ * "monadNN"`, and the unflashed inventory slots collapsed from six near-identical
+ * blocks into one numbered series (`slug = "monad{n:02d}", count = 6, start = 7`).
+ * A parser that only understands literal slugs silently seeds six of twelve.
+ * Since a slug that is not seeded resolves to a 404 on `/d/<slug>`, an under-read
+ * registry is a set of stickers that scan to nothing.
  */
 #[AsCommand(
     name: 'app:devices:seed',
@@ -78,7 +86,7 @@ class SeedDevicesCommand extends Command
 
         $slugs = $this->parseSlugs((string) file_get_contents($path));
         if ([] === $slugs) {
-            $io->error('No [[nodes]] entries found — is that really the label registry?');
+            $io->error('No [[items]] entries found — is that really the label registry?');
 
             return Command::FAILURE;
         }
@@ -141,17 +149,62 @@ class SeedDevicesCommand extends Command
     }
 
     /**
-     * Pull `host = "monadNN"` out of the registry's `[[nodes]]` tables.
+     * Pull every slug out of the registry's `[[items]]` tables.
      *
-     * Anchored to the start of a line so a `host` mentioned inside one of the
+     * Two forms exist and both must be read:
+     *
+     *   [[items]]                      [[items]]
+     *   slug = "monad01"               slug = "monad{n:02d}"
+     *                                  count = 6
+     *                                  start = 7
+     *
+     * The second is a numbered series — the set is defined by its size, so that
+     * the fleet's unflashed inventory slots cannot acquire a skipped or repeated
+     * number by hand. Reading only the first form is not a partial success: it
+     * seeds six of twelve and leaves the other six scanning to a 404.
+     *
+     * Anchored to the start of a line so a `slug` mentioned inside one of the
      * file's long explanatory comments cannot be mistaken for an entry.
      *
      * @return string[] unique, in file order
      */
     private function parseSlugs(string $toml): array
     {
-        preg_match_all('/^\s*host\s*=\s*"([a-z0-9-]+)"/m', $toml, $matches);
+        // Split on the table header so `count`/`start` are attributed to the
+        // series they belong to rather than to whichever one appeared last.
+        $tables = preg_split('/^\s*\[\[items\]\]\s*$/m', $toml) ?: [];
+        $slugs = [];
 
-        return array_values(array_unique($matches[1] ?? []));
+        foreach ($tables as $table) {
+            if (1 !== preg_match('/^\s*slug\s*=\s*"([^"]+)"/m', $table, $m)) {
+                continue;
+            }
+            $slug = $m[1];
+
+            if (!str_contains($slug, '{n')) {
+                $slugs[] = $slug;
+                continue;
+            }
+
+            // A series without a count is a template that names nothing; the
+            // label tooling rejects it at load, so skipping is the honest read.
+            if (1 !== preg_match('/^\s*count\s*=\s*(\d+)/m', $table, $c)) {
+                continue;
+            }
+            $count = (int) $c[1];
+            $start = 1 === preg_match('/^\s*start\s*=\s*(\d+)/m', $table, $s) ? (int) $s[1] : 1;
+
+            for ($n = $start; $n < $start + $count; $n++) {
+                // Mirrors the tooling's `"{n:02d}".format(n=...)`; the registry
+                // uses no other numbering spec.
+                $slugs[] = str_replace(
+                    ['{n:02d}', '{n}'],
+                    [sprintf('%02d', $n), (string) $n],
+                    $slug,
+                );
+            }
+        }
+
+        return array_values(array_unique($slugs));
     }
 }

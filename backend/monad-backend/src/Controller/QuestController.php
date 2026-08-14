@@ -223,8 +223,13 @@ class QuestController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Convert to DTO and return
-        $dto = QuestDetailResponseDto::fromEntity($quest);
+        // Step config is withheld from anonymous callers. The route is
+        // PUBLIC_ACCESS so a stranger can read what a quest asks of them, but
+        // `config` holds `expected_value` for every scan_qr step — the answer key
+        // to the people channel. The `api` firewall is stateless JWT, so a request
+        // carrying a valid Bearer token populates getUser() while an anonymous one
+        // is still served; that is the whole distinction.
+        $dto = QuestDetailResponseDto::fromEntity($quest, includeStepConfig: $this->getUser() !== null);
 
         return $this->json($dto->toArray());
     }
