@@ -59,6 +59,31 @@ class QuestCrudController extends AbstractCrudController
             ->setHelp('JSON array, e.g. ["wifi_associate","ble_witness"]. Matched against what the phone reports.')
             ->hideOnIndex();
         yield TextField::new('featuredImage')->setRequired(false)->hideOnIndex();
+        // IP-128 — which physical nodes offer this quest. EMPTY MEANS EVERY NODE,
+        // which is what every quest written before IP-128 means; treating empty as
+        // "nowhere" would silently unpublish the whole existing catalogue.
+        yield AssociationField::new('armedDevices', 'Armed at devices')
+            ->setRequired(false)
+            ->setHelp('Leave empty to offer this quest at EVERY node. Pick nodes to restrict it.')
+            ->hideOnIndex();
+        // IP-128 — replay policy. NULL/blank means UNLIMITED, which is the behaviour
+        // every quest has today (nothing in this backend has ever blocked a replay).
+        // There is deliberately no system-wide default: a measurement quest wants
+        // none, so a pre-registered session can run the same nodes repeatedly in one
+        // afternoon; an evergreen "collect the fleet" quest wants a cooldown.
+        yield Field::new('recurrence', 'Replay policy')
+            ->formatValue(static fn ($value) => null === $value
+                ? 'unlimited'
+                : json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
+            ->setFormType(JsonType::class)
+            ->setRequired(false)
+            ->setHelp(
+                'Blank = unlimited replays (the default, and what every existing quest does). '
+                .'To add a cooldown: {"scope":"per_device","cooldown_seconds":21600} — per_device '
+                .'makes it independently replayable at each node, per_quest counts it anywhere. '
+                .'A malformed policy degrades to unlimited rather than breaking the catalogue.'
+            )
+            ->hideOnIndex();
         yield AssociationField::new('steps')
             ->formatValue(static fn ($value, $entity) => $entity->getSteps()->count() . ' step(s)')
             ->onlyOnDetail();

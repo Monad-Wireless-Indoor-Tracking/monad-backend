@@ -97,6 +97,10 @@ security:
         - { path: ^/api/auth/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/quests$, roles: PUBLIC_ACCESS }
         - { path: ^/api/quest/[^/]+$, roles: PUBLIC_ACCESS }
+        # IP-128 — the QR device landing. Anchored `$` is load-bearing: any future
+        # /api/device/{slug}/... write route must stay IS_AUTHENTICATED_FULLY by
+        # default rather than inheriting this public hole.
+        - { path: ^/api/device/[^/]+$, roles: PUBLIC_ACCESS }
         - { path: ^/api/admin, roles: ROLE_SUPERADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

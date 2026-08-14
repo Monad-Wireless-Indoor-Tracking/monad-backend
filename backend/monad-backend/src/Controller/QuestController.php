@@ -18,6 +18,10 @@ use App\Entity\QuestStepSkipRecord;
 use App\Entity\User;
 use App\Enum\QuestEnrollmentStatus;
 use App\Enum\QuestStepCompletionStatus;
+use App\Quest\QuestArmingService;
+use App\Quest\QuestAvailability;
+use App\Repository\DeviceRepository;
+use App\Repository\QuestEnrollmentRepository;
 use App\Repository\QuestRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -304,7 +308,11 @@ class QuestController extends AbstractController
     )]
     public function startQuest(
         string $id,
+        Request $request,
         QuestRepository $questRepository,
+        DeviceRepository $deviceRepository,
+        QuestEnrollmentRepository $enrollmentRepository,
+        QuestArmingService $arming,
         EntityManagerInterface $entityManager
     ): JsonResponse {
         // Check authentication
@@ -349,10 +357,58 @@ class QuestController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        // IP-128 — which node is this run happening at? Optional: a quest started
+        // from the catalogue rather than from a scanned label has no device, and
+        // that stays valid.
+        $device = null;
+        $deviceSlug = $request->query->get('device');
+        if (is_string($deviceSlug) && '' !== $deviceSlug) {
+            $device = $deviceRepository->findBySlug($deviceSlug);
+            if (null === $device) {
+                return $this->json([
+                    'error' => 'Unknown device'
+                ], Response::HTTP_NOT_FOUND);
+            }
+        }
+
+        // IP-128 — one gate, shared with the public device page, so a quest can
+        // never look available there and 409 here.
+        $availability = $arming->assess(
+            quest: $quest,
+            user: $user,
+            device: $device,
+            requiresCapture: false,
+        );
+
+        if (!$availability->available) {
+            // A stale IN_PROGRESS run is not a refusal, it is litter: nothing
+            // sets ABANDONED automatically, so a force-quit would otherwise
+            // exclude this participant from this node permanently. Reap and let
+            // the new run proceed.
+            $reaped = false;
+            if (QuestAvailability::REASON_IN_PROGRESS === $availability->reason) {
+                $open = $enrollmentRepository->findOpenFor($user, $quest, $device);
+                if (null !== $open && $arming->isStale($open, $quest)) {
+                    $open->setStatus(QuestEnrollmentStatus::ABANDONED);
+                    $entityManager->flush();
+                    $reaped = true;
+                }
+            }
+
+            if (!$reaped) {
+                return $this->json([
+                    'error' => 'Quest is not available right now',
+                    'reason' => $availability->reason,
+                    'retry_at' => $availability->retryAt?->format(\DateTimeInterface::ATOM),
+                ], Response::HTTP_CONFLICT);
+            }
+        }
+
         // Create quest enrollment
         $enrollment = new QuestEnrollment();
         $enrollment->setUser($user);
         $enrollment->setQuest($quest);
+        $enrollment->setDevice($device);
         $enrollment->setCompletedAt(null);
 
         // Create data path: s3://monad-bucket/experiments/YYYY/MM/DD/:user_id/:quest_id/:enrollment_id/
@@ -551,6 +607,9 @@ class QuestController extends AbstractController
                 $stepDto->status = $stepData['status'] ?? null;
                 $stepDto->started_at = $stepData['started_at'] ?? null;
                 $stepDto->completed_at = $stepData['completed_at'] ?? null;
+                // IP-128 — monotonic reading, so quest labels can be time-joined to
+                // CSI despite RTC-less nodes and adjustable handset clocks.
+                $stepDto->mono_ns = isset($stepData['mono_ns']) ? (string) $stepData['mono_ns'] : null;
                 $stepDto->step_data = $stepData['step_data'] ?? [];
 
                 // Map skip_record if present
@@ -683,6 +742,11 @@ class QuestController extends AbstractController
                 $stepCompletion->setStatus($status);
                 $stepCompletion->setStartedAt(new \DateTime($stepDto->started_at));
                 $stepCompletion->setCompletedAt(new \DateTime($stepDto->completed_at));
+                // IP-128 — the monotonic pair for the wall clock above. Without it a
+                // quest label cannot be placed against a CSI capture with confidence:
+                // fleet nodes have no RTC and get stepped by chrony, and a handset's
+                // wall clock is user-adjustable.
+                $stepCompletion->setMonoNs($stepDto->mono_ns);
                 $stepCompletion->setStepData($stepDto->step_data);
 
                 // Create skip record if needed
@@ -708,7 +772,19 @@ class QuestController extends AbstractController
             }
 
             // 13. Set completed_at timestamp
+            //
+            // This value comes from the REQUEST BODY and is therefore participant
+            // -reported, not observed. It is kept because the participant's own
+            // clock is what their step timings are expressed in — but nothing
+            // that gates access may be measured against it (IP-128).
             $enrollment->setCompletedAt(new \DateTime($requestDto->completed_at));
+
+            // 13b. Stamp the SERVER's view of when this arrived.
+            //
+            // The recurrence cooldown reads only this column. Gating on
+            // `completed_at` above would let a client post a backdated finish and
+            // clear its own cooldown instantly, which is not a cooldown at all.
+            $enrollment->markCompletionReceived();
 
             // 14. Update data_path if data_file provided
             if ($requestDto->data_file) {

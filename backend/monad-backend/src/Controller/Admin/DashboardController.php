@@ -6,6 +6,7 @@ use App\Entity\GroundTruthConflict;
 use App\Entity\GroundTruthScan;
 use App\Entity\News;
 use App\Entity\QrCode;
+use App\Entity\Device;
 use App\Entity\Quest;
 use App\Entity\QuestEnrollment;
 use App\Entity\QuestStep;
@@ -194,6 +195,7 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToCrud('Users', 'fa fa-user', User::class);
 
         yield MenuItem::section('Content');
+        yield MenuItem::linkToCrud('Devices (fleet)', 'fa fa-microchip', Device::class);
         yield MenuItem::linkToCrud('Quests', 'fa fa-flag', Quest::class);
         yield MenuItem::linkToCrud('Quest steps', 'fa fa-list-ol', QuestStep::class);
         yield MenuItem::linkToCrud('Enrollments', 'fa fa-user-check', QuestEnrollment::class);

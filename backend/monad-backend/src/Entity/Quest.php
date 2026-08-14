@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Quest\RecurrencePolicy;
 use App\Repository\QuestRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -77,12 +78,50 @@ class Quest
     #[ORM\OrderBy(['order' => 'ASC'])]
     private Collection $steps;
 
+    /**
+     * How often one participant may repeat this quest (IP-128).
+     *
+     * NULL means UNLIMITED, which is the behaviour every quest has today —
+     * `Version20251202185420` dropped the unique enrollment index and
+     * `startQuest()` performs no enrollment lookup, so nothing has ever prevented
+     * a replay. A cooldown is therefore opt-in per quest, authored in `/admin`,
+     * and there is deliberately no system-wide default: a measurement quest wants
+     * none (a pre-registered session runs the same nodes repeatedly in one
+     * afternoon), while an evergreen "collect the fleet" quest wants one.
+     *
+     * Shape: `{"scope": "per_device"|"per_quest", "cooldown_seconds": int}`.
+     * Read through {@see \App\Quest\RecurrencePolicy::fromArray()}, which returns
+     * null for anything malformed rather than throwing — a bad policy must
+     * degrade to "no extra gate", never take the quest catalogue down.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $recurrence = null;
+
+    /**
+     * Which physical nodes offer this quest (IP-128).
+     *
+     * EMPTY MEANS EVERY NODE, not "none" — that is what every quest written
+     * before IP-128 means, and treating empty as "nowhere" would silently
+     * unpublish the entire existing catalogue on migration.
+     *
+     * @var Collection<int, Device>
+     */
+    #[ORM\ManyToMany(targetEntity: Device::class)]
+    #[ORM\JoinTable(name: 'quest_devices')]
+    #[ORM\JoinColumn(name: 'quest_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'device_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\OrderBy(['slug' => 'ASC'])]
+    private Collection $armedDevices;
+
     public function __construct()
     {
         $this->id = Uuid::v4();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
         $this->steps = new ArrayCollection();
+        $this->armedDevices = new ArrayCollection();
     }
 
     #[ORM\PreUpdate]
@@ -258,6 +297,62 @@ class Quest
         $this->requiredCapabilities = array_values(array_unique($capabilities));
 
         return $this;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getRecurrence(): ?array
+    {
+        return $this->recurrence;
+    }
+
+    /**
+     * @param array<string, mixed>|null $recurrence
+     */
+    public function setRecurrence(?array $recurrence): static
+    {
+        // An empty array is not a policy — normalise it to null so "cleared in
+        // the admin form" and "never set" mean the same thing downstream.
+        $this->recurrence = ($recurrence === null || $recurrence === []) ? null : $recurrence;
+
+        return $this;
+    }
+
+    /** Typed view of {@see getRecurrence()}; null when unset or malformed. */
+    public function getRecurrencePolicy(): ?RecurrencePolicy
+    {
+        return RecurrencePolicy::fromArray($this->recurrence);
+    }
+
+    /**
+     * @return Collection<int, Device>
+     */
+    public function getArmedDevices(): Collection
+    {
+        return $this->armedDevices;
+    }
+
+    public function addArmedDevice(Device $device): static
+    {
+        if (!$this->armedDevices->contains($device)) {
+            $this->armedDevices->add($device);
+        }
+
+        return $this;
+    }
+
+    public function removeArmedDevice(Device $device): static
+    {
+        $this->armedDevices->removeElement($device);
+
+        return $this;
+    }
+
+    /** True when this quest is offered at $device (empty arming = everywhere). */
+    public function isArmedAt(Device $device): bool
+    {
+        return $this->armedDevices->isEmpty() || $this->armedDevices->contains($device);
     }
 
     /** @param string[] $deviceCapabilities */

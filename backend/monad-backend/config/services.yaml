@@ -66,3 +66,12 @@ services:
     App\OpenApi\StorageDecorator:
         decorates: 'App\OpenApi\QuestDecorator'
         arguments: ['@App\OpenApi\StorageDecorator.inner']
+
+    # IP-128 — "is this node capturing?" as a quest-arming input. Fails open: an
+    # unreachable metrics store must not take the participant path down. Empty
+    # MONAD_METRICS_URL disables the check entirely, which is the default.
+    App\Quest\CaptureStateProvider: '@App\Quest\MimirCaptureState'
+
+    App\Quest\MimirCaptureState:
+        arguments:
+            $metricsUrl: '%env(default::MONAD_METRICS_URL)%'

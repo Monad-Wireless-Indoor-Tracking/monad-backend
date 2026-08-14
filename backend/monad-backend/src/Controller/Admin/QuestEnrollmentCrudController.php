@@ -51,6 +51,18 @@ class QuestEnrollmentCrudController extends AbstractCrudController
         yield AssociationField::new('quest')
             ->setFormTypeOption('choice_label', 'name')
             ->formatValue(static fn ($value, $entity) => $entity->getQuest()?->getName() ?? '—');
+        // IP-128 — which physical node produced this run. MEASUREMENT PROVENANCE,
+        // not bookkeeping: read-only for the same reason ground-truth scans are.
+        // An admin screen that could reassign a run to another device would make
+        // the device column unenforceable, invisibly, months before anyone reads
+        // the data.
+        yield AssociationField::new('device', 'Device')
+            ->formatValue(static fn ($value, $entity) => $entity->getDevice()?->getSlug() ?? '—')
+            ->onlyOnDetail();
+        // Server-stamped, and the only column the cooldown gate trusts —
+        // `completedAt` arrives in the request body.
+        yield DateTimeField::new('completionReceivedAt', 'Completion received')
+            ->onlyOnDetail();
         yield ChoiceField::new('status')
             ->setChoices(array_combine(
                 array_map(static fn (QuestEnrollmentStatus $s) => $s->value, QuestEnrollmentStatus::cases()),

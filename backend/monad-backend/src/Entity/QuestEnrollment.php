@@ -39,6 +39,28 @@ class QuestEnrollment
     #[Assert\Length(max: 512, maxMessage: 'Data path cannot be longer than {{ limit }} characters')]
     private ?string $dataPath = null;
 
+    /**
+     * Which physical node produced this run (IP-128).
+     *
+     * MEASUREMENT PROVENANCE once written, not bookkeeping — it is the record of
+     * where a measurement came from, so the admin renders it read-only and the
+     * device row can be deactivated but never deleted (ON DELETE RESTRICT).
+     */
+    #[ORM\ManyToOne(targetEntity: Device::class)]
+    #[ORM\JoinColumn(name: 'device_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?Device $device = null;
+
+    /**
+     * When the SERVER received the completion (IP-128).
+     *
+     * Distinct from `$completedAt`, which `QuestController::completeQuest()` sets
+     * from the request body. A cooldown measured against a client-supplied
+     * timestamp is not a cooldown — a backdated finish clears it instantly — so
+     * the recurrence gate reads only this column.
+     */
+    #[ORM\Column(name: 'completion_received_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $completionReceivedAt = null;
+
     #[ORM\Column(name: 'completed_at', type: 'datetime', nullable: true)]
     private ?\DateTime $completedAt = null;
 
@@ -159,6 +181,31 @@ class QuestEnrollment
                 $stepCompletion->setEnrollment(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getDevice(): ?Device
+    {
+        return $this->device;
+    }
+
+    public function setDevice(?Device $device): static
+    {
+        $this->device = $device;
+
+        return $this;
+    }
+
+    public function getCompletionReceivedAt(): ?\DateTimeImmutable
+    {
+        return $this->completionReceivedAt;
+    }
+
+    /** Stamped by the server on receipt; never taken from a request body. */
+    public function markCompletionReceived(?\DateTimeImmutable $at = null): static
+    {
+        $this->completionReceivedAt = $at ?? new \DateTimeImmutable();
 
         return $this;
     }
