@@ -35,7 +35,16 @@ class MarkerService
     /**
      * Every distinct marker the current quests ask for, with the quests that ask.
      *
-     * @return list<array{value: string, label: string, quests: list<string>}>
+     * Quests are described rather than named (IP-129 §2.4): the portal's `/m/<code>` page tells
+     * whoever scanned a card what it is for, and "EXP-C1 Day 1" alone says nothing to a stranger.
+     * The id travels with the name so that page can link to the quest rather than re-resolve it
+     * by a name that is not a key.
+     *
+     * @return list<array{
+     *     value: string,
+     *     label: string,
+     *     quests: list<array{id: string, name: string, description: ?string, points: float, estimated_duration: ?int}>
+     * }>
      */
     public function markers(): array
     {
@@ -53,13 +62,33 @@ class MarkerService
             }
 
             $markers[$value] ??= ['value' => $value, 'label' => $step->getName() ?? $value, 'quests' => []];
-            $questName = $step->getQuest()?->getName();
-            if ($questName !== null && !in_array($questName, $markers[$value]['quests'], true)) {
-                $markers[$value]['quests'][] = $questName;
+            $quest = $step->getQuest();
+            $questId = (string) $quest?->getId();
+            if ($quest === null || $questId === '') {
+                continue;
             }
+
+            // Dedup on the id, not the name: one quest can scan the same card twice (in and out
+            // of a leg), and two quests are allowed to share a name.
+            if (isset($markers[$value]['quests'][$questId])) {
+                continue;
+            }
+
+            $markers[$value]['quests'][$questId] = [
+                'id' => $questId,
+                'name' => (string) $quest->getName(),
+                'description' => $quest->getDescription(),
+                'points' => $quest->getPoints(),
+                'estimated_duration' => $quest->getEstimatedDuration(),
+            ];
         }
 
-        return array_values($markers);
+        // The quest map is keyed by id only to dedup; callers get a list.
+        return array_values(array_map(static function (array $marker): array {
+            $marker['quests'] = array_values($marker['quests']);
+
+            return $marker;
+        }, $markers));
     }
 
     /**

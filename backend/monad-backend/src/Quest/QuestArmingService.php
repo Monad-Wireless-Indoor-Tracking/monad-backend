@@ -163,6 +163,26 @@ final class QuestArmingService
         return $device;
     }
 
+    /**
+     * Whether a quest's steps produce measurement, and therefore need the node to be capturing.
+     *
+     * Derived from the step types rather than a flag, so it cannot drift out of sync with what a
+     * quest actually does. It lives here, next to the rule that consumes it, because two callers
+     * now ask — the public device page and the IP-129 arming matrix — and a quest that "requires
+     * capture" on one and not the other would put two different availability reasons on one page.
+     */
+    public static function producesMeasurement(Quest $quest): bool
+    {
+        foreach ($quest->getSteps() as $step) {
+            $type = $step->getType();
+            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @return QuestEnrollmentStatus[] statuses that occupy a participant */
     public static function occupyingStatuses(): array
     {

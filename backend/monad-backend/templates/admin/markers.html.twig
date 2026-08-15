@@ -24,7 +24,7 @@
                     <figcaption>
                         <div class="marker-label">{{ marker.label }}</div>
                         <code>{{ marker.value }}</code>
-                        <div class="marker-quests text-muted">{{ marker.quests|join(' · ') }}</div>
+                        <div class="marker-quests text-muted">{{ marker.quests|map(q => q.name)|join(' · ') }}</div>
                     </figcaption>
                 </figure>
             {% endfor %}

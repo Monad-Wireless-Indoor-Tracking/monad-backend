@@ -101,6 +101,16 @@ security:
         # /api/device/{slug}/... write route must stay IS_AUTHENTICATED_FULLY by
         # default rather than inheriting this public hole.
         - { path: ^/api/device/[^/]+$, roles: PUBLIC_ACCESS }
+        # IP-129 — the marker landing page reads this to say whether the card someone
+        # is holding is in use. Anchored for the same reason: `/api/lab/*` is otherwise
+        # authenticated (it carries AP credentials and accepts ground-truth writes), and
+        # only this one read is public.
+        - { path: ^/api/lab/marker-index$, roles: PUBLIC_ACCESS }
+        # IP-129 §4.2 — the arming matrix behind the portal's read-only ops view. Public for the
+        # same narrow reason and anchored the same way. It publishes experimental design and no
+        # answer key: the projection carries no steps at all, so `expected_value` cannot ride
+        # along (ArmingMatrixResponseDto).
+        - { path: ^/api/lab/arming-matrix$, roles: PUBLIC_ACCESS }
         - { path: ^/api/admin, roles: ROLE_SUPERADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

@@ -62,7 +62,7 @@ class DeviceController extends AbstractController
                 quest: $quest,
                 user: null,
                 device: $device,
-                requiresCapture: $this->producesMeasurement($quest),
+                requiresCapture: QuestArmingService::producesMeasurement($quest),
             );
 
             if (QuestAvailabilityFilter::isHidden($availability->reason)) {
@@ -94,25 +94,6 @@ class DeviceController extends AbstractController
         $response->headers->set('Cache-Control', 'public, max-age=30');
 
         return $response;
-    }
-
-    /**
-     * Whether a quest's steps produce measurement, and therefore need the node to
-     * be capturing.
-     *
-     * Derived from the step types rather than a flag, so it cannot drift out of
-     * sync with what a quest actually does.
-     */
-    private function producesMeasurement(Quest $quest): bool
-    {
-        foreach ($quest->getSteps() as $step) {
-            $type = $step->getType();
-            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to'], true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
 
