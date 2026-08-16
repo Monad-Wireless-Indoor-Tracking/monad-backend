@@ -48,6 +48,13 @@ services:
       HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
       HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
       HETZNER_S3_PRESIGNED_URL_EXPIRY: ${HETZNER_S3_PRESIGNED_URL_EXPIRY:-+15 minutes}
+      # Mimir, by container DNS on the shared network below — it publishes no
+      # host port and has no auth of its own, so the bridge is its access
+      # control. Read by GET /api/lab/fleet (so the public site, a host process,
+      # never needs a route into the observability stack) and by the IP-128
+      # quest-arming check. Empty disables both, and the fleet endpoint then
+      # reports `reachable: false` rather than an invented quiet fleet.
+      MONAD_METRICS_URL: ${MONAD_METRICS_URL:-http://mimir:9009/prometheus}
     ports:
       # Loopback only; api.monad.dubec.dev is terminated by the host nginx.
       # NOT 8080 — Headscale's control server already listens there, and the

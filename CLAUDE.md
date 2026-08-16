@@ -29,6 +29,13 @@ API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL.
 | `POST /api/lab/ground-truth` | Ground-truth check-in/out scans from participant devices, single or batched. Idempotent on `scan_nonce`. |
 | `GET /api/lab/ground-truth/{labSessionId}` | Live room-wide people tally for one session, per zone and overall. Cheap to poll. |
 | `/api/auth/*`, `/api/quest*` | Accounts and the quest schedule engine. |
+| `GET /api/lab/fleet` | The fleet's public vital signs for `monad.dubec.dev` — per-node readings and fleet-wide scalars, from a closed PromQL allow-list (`App\Fleet\FleetMetricsReader`). Exists so the website, a host process, never needs a route into the observability stack: Mimir publishes no host port, this container is on the same `monad` network and reaches `mimir:9009` by container DNS. Unauthenticated (the site holds no JWT) and **404'd on the public vhost** like `/admin` — the site calls it over loopback. `reachable: false` is a first-class answer and must not be rendered as zeros. |
+
+`MONAD_METRICS_URL` (`http://mimir:9009/prometheus`) is read by two things, because it is one
+dependency: the fleet endpoint above, and the IP-128 quest-arming check ("is this node
+capturing?"). The arming check **fails open** and was inert while the variable was unset — setting
+it turns it on, so a measurement quest at a resting node stops being offered. That is the designed
+behaviour and it is a change to the participant path; set it to `""` to keep it off.
 
 ## Management interface (`/admin`)
 

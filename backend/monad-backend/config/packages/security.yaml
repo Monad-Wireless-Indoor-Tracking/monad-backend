@@ -111,6 +111,14 @@ security:
         # answer key: the projection carries no steps at all, so `expected_value` cannot ride
         # along (ArmingMatrixResponseDto).
         - { path: ^/api/lab/arming-matrix$, roles: PUBLIC_ACCESS }
+        # The fleet's public vital signs, which exist so the website never needs a
+        # route into the observability stack. Anchored like its neighbours. It
+        # carries no credential and no identifier — a closed allow-list of PromQL
+        # decided in FleetMetricsReader, of which only the `host` label survives —
+        # and the site holds no JWT, so requiring one would mean handing a public
+        # cookie-less website a credential to store. nginx additionally 404s this
+        # path on the Internet-facing vhost; the site calls it over loopback.
+        - { path: ^/api/lab/fleet$, roles: PUBLIC_ACCESS }
         - { path: ^/api/admin, roles: ROLE_SUPERADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

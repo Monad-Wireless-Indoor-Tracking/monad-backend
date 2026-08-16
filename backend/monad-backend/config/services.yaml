@@ -75,3 +75,18 @@ services:
     App\Quest\MimirCaptureState:
         arguments:
             $metricsUrl: '%env(default::MONAD_METRICS_URL)%'
+
+    # The fleet's public vital signs for the website (`GET /api/lab/fleet`).
+    #
+    # Same $metricsUrl as the arming check above, because it is the same
+    # dependency: one address for "where Mimir is". Empty means the endpoint
+    # reports `reachable: false` — which the site renders as a sentence, not as
+    # zeros — so an unconfigured deployment degrades honestly rather than
+    # inventing a quiet fleet.
+    #
+    # In production that value is `http://mimir:9009/prometheus`: container DNS
+    # on the shared `monad` bridge, so Mimir needs no published host port and
+    # the website needs no route into the observability stack.
+    App\Fleet\FleetMetricsReader:
+        arguments:
+            $metricsUrl: '%env(default::MONAD_METRICS_URL)%'
