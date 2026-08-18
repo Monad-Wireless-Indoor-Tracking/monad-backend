@@ -175,7 +175,9 @@ final class QuestArmingService
     {
         foreach ($quest->getSteps() as $step) {
             $type = $step->getType();
-            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to'], true)) {
+            // ble_advertise counts: a broadcast nobody captures awards a stamp for data never
+            // recorded, which is exactly the failure the node-idle gate exists to prevent.
+            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to', 'ble_advertise'], true)) {
                 return true;
             }
         }

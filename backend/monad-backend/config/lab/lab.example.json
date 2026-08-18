@@ -29,6 +29,12 @@
     ]
   },
 
+  "advertise": {
+    "namespace_uuid": "6d6f6e61-6461-4076-b100-000000000000",
+    "interval_ms": 250,
+    "tx_power": "medium"
+  },
+
   "traffic_profiles": [
     { "id": "ladder-25",  "label": "25 Hz",  "rate_hz": 25,  "payload_bytes": 200, "duration_seconds": 300, "ap_id": "illum-24" },
     { "id": "ladder-50",  "label": "50 Hz",  "rate_hz": 50,  "payload_bytes": 200, "duration_seconds": 300, "ap_id": "illum-24" },

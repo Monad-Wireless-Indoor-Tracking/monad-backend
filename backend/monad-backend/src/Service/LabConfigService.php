@@ -59,6 +59,15 @@ class LabConfigService
             'collector' => ['host' => '', 'udp_port' => 9999, 'http_base' => ''],
             'access_points' => [],
             'beacons' => ['uuid' => '', 'majors' => [], 'zones' => []],
+            // The phone-side identity broadcast (ble_advertise steps / the broadcaster role).
+            // namespace_uuid's last four bytes are replaced on the phone by the participant and
+            // session keys, so the frame identifies a session, not a person. An empty namespace
+            // means broadcasting is not configured on this deployment.
+            'advertise' => [
+                'namespace_uuid' => '',
+                'interval_ms' => 250,
+                'tx_power' => 'medium',
+            ],
             'traffic_profiles' => [],
             'clock_sync' => [
                 'burst_size' => 20,

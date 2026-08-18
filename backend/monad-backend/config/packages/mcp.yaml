@@ -18,9 +18,10 @@ mcp:
         This server authors the content of a running measurement lab.
 
         Quests are participant scripts. A quest is a sequence of steps; the step types are
-        start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture, finish.
+        start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture,
+        ble_advertise, finish.
 
-        Two facts about this deployment that change what is valid:
+        Three facts about this deployment that change what is valid:
 
         1. There is no access point. AP mode is impossible on the fleet's AX210 (the Intel LAR
            firmware limit crashes the iax backport), so illumination is monitor-mode injection
@@ -29,6 +30,10 @@ mcp:
         2. A scan_qr step is matched by string. The app compares the scanned text to the step's
            `expected_value` (case-insensitive) and nothing consults a table, so the marker a
            participant scans must carry exactly that string. Render it with lab_marker_svg.
+        3. A ble_advertise step makes the phone broadcast the lab identity frame so the fleet's
+           passive BLE scan can observe it. The identity comes from the lab bundle's advertise
+           namespace, never from the quest config. iOS honours it only in the foreground, and
+           the quest automatically requires the ble.advertise capability.
 
     client_transports:
         http: true

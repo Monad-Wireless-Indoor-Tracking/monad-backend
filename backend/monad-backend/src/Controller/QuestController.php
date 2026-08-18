@@ -171,7 +171,7 @@ class QuestController extends AbstractController
                         properties: [
                             new OA\Property(property: 'id', type: 'string', format: 'uuid', example: '70000a54-e220-4b17-95c3-ebdfa164caf9', description: 'Step unique identifier'),
                             new OA\Property(property: 'name', type: 'string', example: 'Scan QR Code at Library', description: 'Step name'),
-                            new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish'], example: 'scan_qr', description: 'Step type'),
+                            new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'sensor_capture', 'ble_advertise', 'finish'], example: 'scan_qr', description: 'Step type'),
                             new OA\Property(property: 'order', type: 'integer', example: 1, description: 'Step order in quest sequence'),
                             new OA\Property(property: 'config', type: 'object', example: ['qr_code_id' => 'abc123'], description: 'Step-specific configuration')
                         ],
@@ -269,7 +269,7 @@ class QuestController extends AbstractController
                                     new OA\Property(property: 'step_id', type: 'string', format: 'uuid'),
                                     new OA\Property(property: 'step_completion_id', type: 'string', format: 'uuid'),
                                     new OA\Property(property: 'name', type: 'string'),
-                                    new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish']),
+                                    new OA\Property(property: 'type', type: 'string', enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'sensor_capture', 'ble_advertise', 'finish']),
                                     new OA\Property(property: 'order', type: 'integer'),
                                     new OA\Property(property: 'config', type: 'object')
                                 ],

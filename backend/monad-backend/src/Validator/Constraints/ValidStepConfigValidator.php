@@ -55,7 +55,53 @@ class ValidStepConfigValidator extends ConstraintValidator
             QuestStepType::START, QuestStepType::FINISH => $this->validateStartFinishConfig($config, $constraint),
             QuestStepType::CONNECT_TO_AP => $this->validateConnectToApConfig($config, $constraint),
             QuestStepType::WALK_TO => $this->validateWalkToConfig($config, $constraint),
+            QuestStepType::SENSOR_CAPTURE => $this->validateSensorCaptureConfig($config, $constraint),
+            QuestStepType::BLE_ADVERTISE => $this->validateBleAdvertiseConfig($config, $constraint),
         };
+    }
+
+    private function validateSensorCaptureConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::SENSOR_CAPTURE->value;
+
+        // The module id is the only contract; the rest of the config is passed opaque to the module.
+        $this->requireString($config, 'module', $type, $constraint);
+    }
+
+    private function validateBleAdvertiseConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::BLE_ADVERTISE->value;
+
+        // Required: how long the frame must stay on air. The identity itself comes from the lab
+        // bundle's advertise namespace, never from a quest config a participant can read.
+        $this->requirePositiveInteger($config, 'duration_seconds', $type, $constraint);
+
+        // Optional: commanded advertising interval. Android maps it onto AdvertiseSettings buckets
+        // and iOS cannot set it at all, so it is a request, not a promise — but an impossible
+        // value is still an authoring error.
+        if (isset($config['adv_interval_ms'])) {
+            $this->validateInteger($config, 'adv_interval_ms', $type, $constraint);
+            if (is_int($config['adv_interval_ms'])
+                && ($config['adv_interval_ms'] < 100 || $config['adv_interval_ms'] > 10240)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', 'adv_interval_ms')
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be between 100 and 10240 (BLE advertising interval bounds)')
+                    ->addViolation();
+            }
+        }
+
+        if (isset($config['tx_power'])) {
+            $this->validateString($config, 'tx_power', $type, $constraint);
+            $allowed = ['ultra_low', 'low', 'medium', 'high'];
+            if (is_string($config['tx_power']) && !in_array($config['tx_power'], $allowed, true)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', 'tx_power')
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be one of: ultra_low, low, medium, high')
+                    ->addViolation();
+            }
+        }
     }
 
     private function validateScanQrConfig(array $config, ValidStepConfig $constraint): void

@@ -92,7 +92,7 @@ class AdminController extends AbstractController
                             new OA\Property(
                                 property: 'type',
                                 type: 'string',
-                                enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'finish']
+                                enum: ['start', 'wait', 'scan_qr', 'connect_to_ap', 'walk_to', 'find_ble_device', 'sensor_capture', 'ble_advertise', 'finish']
                             ),
                             new OA\Property(property: 'order', type: 'integer', example: 0),
                             new OA\Property(

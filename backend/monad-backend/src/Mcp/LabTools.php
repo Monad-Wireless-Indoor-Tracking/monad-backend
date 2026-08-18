@@ -112,10 +112,16 @@ class LabTools
         name: 'lab_quest_write',
         description: <<<'TXT'
             Create or replace a quest by name. Steps are [{order, name, type, config}]; types are
-            start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture, finish.
+            start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture,
+            ble_advertise, finish.
             Do NOT author connect_to_ap on this deployment: there is no AP to associate to and the
             run would block. A scan_qr step needs config.expected_value — that string is what the
             participant's scan is matched against, and lab_marker_svg renders it.
+            A ble_advertise step needs config.duration_seconds; it broadcasts the lab identity
+            frame (derived from the bundle's advertise namespace, never authored into the quest)
+            and iOS honours it only while the app is in the foreground. The quest's
+            required_capabilities gains "ble.advertise" automatically, so handsets that cannot
+            broadcast are never offered it.
             TXT,
     )]
     public function questWrite(
@@ -142,7 +148,6 @@ class LabTools
         $quest->setCreatedBy($author);
         $quest->setPoints($points);
         $quest->setEstimatedDuration($estimated_duration);
-        $quest->setRequiredCapabilities([]);
 
         try {
             $quest->setAvailableFrom(new \DateTime($available_from));
@@ -152,6 +157,7 @@ class LabTools
         }
 
         $warnings = [];
+        $requiredCapabilities = [];
 
         if ($existed) {
             foreach ($quest->getSteps()->toArray() as $old) {
@@ -181,6 +187,15 @@ class LabTools
                 $warnings[] = sprintf('Step %d is a scan with no expected_value: it matches any code.', $i);
             }
 
+            if ($type === QuestStepType::BLE_ADVERTISE) {
+                $requiredCapabilities[] = 'ble.advertise';
+                $warnings[] = sprintf(
+                    'Step %d broadcasts the lab identity frame. iOS honours it only in the '
+                    . 'foreground, and the quest now requires the ble.advertise capability.',
+                    $i,
+                );
+            }
+
             $step = new QuestStep();
             $step->setName($data['name'] ?? null);
             $step->setType($type);
@@ -189,6 +204,8 @@ class LabTools
             $quest->addStep($step);
             $this->entityManager->persist($step);
         }
+
+        $quest->setRequiredCapabilities($requiredCapabilities);
 
         $this->entityManager->persist($quest);
         $this->entityManager->flush();

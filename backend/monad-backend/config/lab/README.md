@@ -16,6 +16,12 @@ Fields worth understanding rather than copying:
   device name.
 - `beacons.majors` groups anchors into CoreLocation regions. iOS monitors at most **20 regions per
   app**, so use `major` for floors or zone clusters and let ranging resolve the individual anchor.
+- `advertise.namespace_uuid` is the base of the phone's identity broadcast (a 128-bit service
+  UUID). The phone replaces the **last four bytes** with its 16-bit participant key and 16-bit
+  session key, so keep those bytes zero in the bundle. The fleet's passive scan matches on the
+  first twelve bytes. An empty string disables broadcasting on this deployment. `interval_ms` is
+  the *commanded* interval — Android rounds it onto its advertising buckets and iOS cannot set
+  one at all; the accepted value is recorded per session.
 - `traffic_profiles[].rate_hz` is the *commanded* pace. The delivered pace is measured separately
   and reported per session — a source that does not report its realised rate is not usable as a
   sampling axis.
