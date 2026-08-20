@@ -110,6 +110,18 @@ Doctrine entity — it describes physical reality and is edited next to the hard
 `config/lab/README.md` for the fields that are easy to get wrong (`collector.host` must be a
 literal IPv4; iOS monitors at most 20 beacon regions).
 
+**IP-133 — the bundle carries a `telemetry` block, and this API does not own it.** It names the
+public OTLP endpoint handsets ship instrument health to, plus the basic-auth credential for it.
+The phone posts **straight to Alloy**; nothing about that data path passes through here. This
+endpoint only *delivers the credential*, because the bundle is already authenticated and
+already carries AP passwords, and an app binary is readable — so a compiled-in secret would be
+a published one.
+
+Ansible renders the block from `vault_handset_telemetry_password`, the same variable that
+writes Alloy's htpasswd, so the two cannot disagree about the value. Rotating means running
+both `control_plane.yml --tags telemetry` and `monad-api.yml`. See
+`monad-knowledge/docs/HANDSET-TELEMETRY.md`.
+
 ## Legal pages
 
 - Terms & Conditions: `/terms`

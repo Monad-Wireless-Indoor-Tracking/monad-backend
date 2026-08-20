@@ -8,6 +8,7 @@ use App\Exception\AuthException;
 use App\Exception\ValidationException;
 use App\Service\LabTelemetry;
 use App\Service\S3Service;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,6 +24,7 @@ class S3Controller extends AbstractController
     public function __construct(
         private S3Service $s3Service,
         private LabTelemetry $telemetry,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -455,6 +457,22 @@ class S3Controller extends AbstractController
         if ($sidecar !== null) {
             $this->telemetry->sessionCompleted($sidecar);
         }
+
+        // The counter above says how many artefacts arrived; it cannot say WHICH, for WHICH session,
+        // or how big. This hop — phone to archive — is the most fragile step in the whole instrument
+        // and until now it wrote nothing to the journal: on 2026-08-19 the `api` service produced 37
+        // log lines in seven hours and every one was an Internet scanner probing for `.env`. A
+        // session that failed to upload was therefore indistinguishable from a session nobody ran.
+        $this->logger->info('[lab-upload] artefact stored', [
+            'session_id' => $sessionId,
+            'participant' => $participantId,
+            'artefact' => $filename,
+            'bytes' => $contentLength,
+            'content_type' => $contentType,
+            // `metadata.json` arrives last, by client contract, so this flag is the line that marks
+            // a session complete rather than merely in progress.
+            'session_complete' => $sidecar !== null,
+        ]);
 
         return $this->json($result, Response::HTTP_OK);
     }
