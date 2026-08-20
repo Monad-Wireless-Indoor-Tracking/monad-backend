@@ -444,16 +444,37 @@ class S3Controller extends AbstractController
         }
 
         // Direct stream from php://input to object storage — no temp file.
-        $result = $this->s3Service->directSessionStreamUpload(
-            filename: $filename,
-            contentType: $contentType,
-            contentLength: $contentLength,
-            participantId: $participantId,
-            sessionId: $sessionId,
-            body: $sidecar,
-        );
+        //
+        // Timed and failure-counted because this is the hop the whole instrument depends on and the
+        // one nobody could see: a participant on a lab AP with no route out fails here, and until
+        // this was instrumented the only trace of it was a session that never appeared in S3.
+        $startedAt = microtime(true);
+        try {
+            $result = $this->s3Service->directSessionStreamUpload(
+                filename: $filename,
+                contentType: $contentType,
+                contentLength: $contentLength,
+                participantId: $participantId,
+                sessionId: $sessionId,
+                body: $sidecar,
+            );
+        } catch (\Throwable $e) {
+            // Counted, logged, and RETHROWN. The client must still see the failure so its retry
+            // logic runs — swallowing it here would turn a recoverable upload into a lost session.
+            $this->telemetry->artefactFailed($filename);
+            $this->logger->error('[lab-upload] artefact FAILED', [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'bytes' => $contentLength,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+        $elapsed = microtime(true) - $startedAt;
 
         $this->telemetry->artefactAccepted($filename);
+        $this->telemetry->artefactStored($filename, $contentLength, $elapsed);
         if ($sidecar !== null) {
             $this->telemetry->sessionCompleted($sidecar);
         }
@@ -469,6 +490,7 @@ class S3Controller extends AbstractController
             'artefact' => $filename,
             'bytes' => $contentLength,
             'content_type' => $contentType,
+            'seconds' => round($elapsed, 3),
             // `metadata.json` arrives last, by client contract, so this flag is the line that marks
             // a session complete rather than merely in progress.
             'session_complete' => $sidecar !== null,

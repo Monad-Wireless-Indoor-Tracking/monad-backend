@@ -34,6 +34,9 @@ use OpenTelemetry\API\Metrics\HistogramInterface;
 class LabTelemetry
 {
     private CounterInterface $uploads;
+    private CounterInterface $uploadFailures;
+    private HistogramInterface $uploadBytes;
+    private HistogramInterface $uploadSeconds;
     private CounterInterface $unpinned;
     private HistogramInterface $intervalCv;
     private HistogramInterface $delivered;
@@ -47,6 +50,30 @@ class LabTelemetry
             'monad.lab.session.uploaded',
             'artefacts',
             'Lab-session artefacts accepted by the API',
+        );
+        // ── The phone -> archive hop ────────────────────────────────────────────────
+        // `uploads` above counts artefacts and says nothing about SIZE, DURATION or FAILURE, and
+        // until 2026-08-19 this hop wrote no log line either: the `api` service produced 37 lines
+        // in seven hours and every one was an Internet scanner probing for `.env`. A session that
+        // failed to upload was indistinguishable from a session nobody ran.
+        //
+        // Bytes and duration are histograms rather than counters because the question is a
+        // DISTRIBUTION: "is this upload slow" needs a p95 against the others, not a total. A
+        // participant on a lab AP with no route out is the normal case, so the tail is the signal.
+        $this->uploadFailures = $meter->createCounter(
+            'monad.lab.upload.failed',
+            'artefacts',
+            'Artefacts that did not reach object storage',
+        );
+        $this->uploadBytes = $meter->createHistogram(
+            'monad.lab.upload.bytes',
+            'By',
+            'Size of one accepted artefact',
+        );
+        $this->uploadSeconds = $meter->createHistogram(
+            'monad.lab.upload.duration',
+            's',
+            'Wall time to stream one artefact to object storage',
         );
         $this->unpinned = $meter->createCounter(
             'monad.lab.session.unpinned',
@@ -73,11 +100,44 @@ class LabTelemetry
     /**
      * Record one accepted artefact.
      *
+     * `artefact` is the filename, which is a CLOSED set — the session's artefact names are fixed by
+     * `LabSession` (`pose.tsv`, `beacons.tsv`, `metadata.json`, …). It is safe as a label for the
+     * same reason `participant` is: bounded by the design, not by how many sessions run.
+     *
      * @param array<string, mixed> $attributes
      */
     public function artefactAccepted(string $filename, array $attributes = []): void
     {
         $this->uploads->add(1, ['artefact' => $filename] + $attributes);
+    }
+
+    /**
+     * Record the size and cost of one accepted artefact.
+     *
+     * Separate from [artefactAccepted] because the counter must increment even when the caller has
+     * no timing to report — a count that depends on a stopwatch is a count that goes missing.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    public function artefactStored(string $filename, int $bytes, float $seconds, array $attributes = []): void
+    {
+        $labels = ['artefact' => $filename] + $attributes;
+        if ($bytes > 0) {
+            $this->uploadBytes->record($bytes, $labels);
+        }
+        if ($seconds > 0.0) {
+            $this->uploadSeconds->record($seconds, $labels);
+        }
+    }
+
+    /**
+     * Record an artefact that did not make it.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    public function artefactFailed(string $filename, array $attributes = []): void
+    {
+        $this->uploadFailures->add(1, ['artefact' => $filename] + $attributes);
     }
 
     /**
