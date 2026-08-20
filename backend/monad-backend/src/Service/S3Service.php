@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Uuid;
 
 class S3Service
 {
-    private const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+    private const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
     private const ALLOWED_CONTENT_TYPES = [
         'application/octet-stream',
         'application/json',

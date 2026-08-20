@@ -22,14 +22,17 @@ RUN install-php-extensions \
         protobuf \
         opentelemetry
 
-# Upload limits mirror S3Service::MAX_FILE_SIZE (50 MB). If the PHP limit were lower, an oversized
-# session artefact would be rejected by the runtime with an opaque error before the service's own
-# validation could produce a useful one.
+# Upload limits mirror S3Service::MAX_FILE_SIZE (500 MB, raised 2026-08-20 for large LiDAR
+# mesh.ply / ARWorldMap artefacts). If the PHP limit were lower, an oversized session artefact
+# would be rejected by the runtime with an opaque error before the service's own validation could
+# produce a useful one. memory_limit carries headroom above the file size for multipart parsing;
+# max_execution_time tracks the nginx proxy_read_timeout / proxy_send_timeout in the vhost so PHP
+# is never the shorter clock on a slow upload.
 RUN { \
-        echo "upload_max_filesize = 50M"; \
-        echo "post_max_size = 52M"; \
-        echo "memory_limit = 512M"; \
-        echo "max_execution_time = 300"; \
+        echo "upload_max_filesize = 500M"; \
+        echo "post_max_size = 520M"; \
+        echo "memory_limit = 1024M"; \
+        echo "max_execution_time = 3000"; \
         echo "opcache.enable = 1"; \
         echo "opcache.validate_timestamps = 0"; \
         echo "opcache.max_accelerated_files = 20000"; \

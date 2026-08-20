@@ -91,7 +91,7 @@ class ErrorCode
             self::RESOURCE_FORBIDDEN => 'Access to resource is forbidden',
 
             self::STORAGE_UPLOAD_FAILED => 'File upload failed',
-            self::STORAGE_FILE_TOO_LARGE => 'File size exceeds maximum allowed (50 MB)',
+            self::STORAGE_FILE_TOO_LARGE => 'File size exceeds maximum allowed (500 MB)',
             self::STORAGE_INVALID_FILE_TYPE => 'File type is not allowed',
             self::STORAGE_FILENAME_REQUIRED => 'Filename is required',
             self::STORAGE_S3_UNAVAILABLE => 'Storage service is temporarily unavailable',
