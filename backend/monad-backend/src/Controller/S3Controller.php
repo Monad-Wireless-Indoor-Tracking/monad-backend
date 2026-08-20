@@ -462,13 +462,25 @@ class S3Controller extends AbstractController
             // Counted, logged, and RETHROWN. The client must still see the failure so its retry
             // logic runs — swallowing it here would turn a recoverable upload into a lost session.
             $this->telemetry->artefactFailed($filename);
-            $this->logger->error('[lab-upload] artefact FAILED', [
-                'session_id' => $sessionId,
-                'participant' => $participantId,
-                'artefact' => $filename,
-                'bytes' => $contentLength,
-                'error' => $e->getMessage(),
-            ]);
+            // The reason is in the MESSAGE, not only in the context array, and that is deliberate.
+            // This project installs no MonologBundle, so `LoggerInterface` resolves to Symfony's
+            // built-in `HttpKernel\Log\Logger`, which interpolates `{placeholders}` from the context
+            // and then DISCARDS everything else. On 2026-08-20 that turned twenty-two real upload
+            // failures into twenty-two identical reason-free lines in Loki, and the one field that
+            // mattered — `error` — never left the process. The context array is kept as-is so a
+            // future structured handler gets the fields; the placeholders are what makes the line
+            // readable today.
+            $this->logger->error(
+                '[lab-upload] artefact FAILED: {artefact} for session {session_id} '
+                . '({bytes} bytes, participant {participant}): {error}',
+                [
+                    'session_id' => $sessionId,
+                    'participant' => $participantId,
+                    'artefact' => $filename,
+                    'bytes' => $contentLength,
+                    'error' => $e->getMessage(),
+                ]
+            );
             throw $e;
         }
         $elapsed = microtime(true) - $startedAt;
@@ -484,17 +496,30 @@ class S3Controller extends AbstractController
         // and until now it wrote nothing to the journal: on 2026-08-19 the `api` service produced 37
         // log lines in seven hours and every one was an Internet scanner probing for `.env`. A
         // session that failed to upload was therefore indistinguishable from a session nobody ran.
-        $this->logger->info('[lab-upload] artefact stored', [
-            'session_id' => $sessionId,
-            'participant' => $participantId,
-            'artefact' => $filename,
-            'bytes' => $contentLength,
-            'content_type' => $contentType,
-            'seconds' => round($elapsed, 3),
-            // `metadata.json` arrives last, by client contract, so this flag is the line that marks
-            // a session complete rather than merely in progress.
-            'session_complete' => $sidecar !== null,
-        ]);
+        //
+        // Placeholders rather than context-only, for the reason spelled out on the failure path
+        // above: without MonologBundle the context array never reaches the journal, so a success
+        // line that names nothing is as blind as the failure line was.
+        $this->logger->info(
+            '[lab-upload] artefact stored: {artefact} for session {session_id} '
+            . '({bytes} bytes, {content_type}, {seconds}s, participant {participant}, '
+            . 'session_complete={session_complete})',
+            [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'bytes' => $contentLength,
+                'content_type' => $contentType,
+                'seconds' => round($elapsed, 3),
+                // `metadata.json` arrives last, by client contract, so this flag is the line that
+                // marks a session complete rather than merely in progress.
+                //
+                // Rendered as a string: Symfony's minimal logger interpolates scalars with
+                // `strtr`, and a raw PHP bool would interpolate as "1" or as the empty string —
+                // and an empty string is exactly the value you cannot tell from a missing field.
+                'session_complete' => $sidecar !== null ? 'true' : 'false',
+            ]
+        );
 
         return $this->json($result, Response::HTTP_OK);
     }
