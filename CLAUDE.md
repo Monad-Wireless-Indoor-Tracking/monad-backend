@@ -24,7 +24,7 @@ API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL.
 | Route | Purpose |
 |---|---|
 | `POST /api/storage/session-upload` | Stream one lab-session artefact to object storage. Streams first, `metadata.json` last — its presence marks the session complete. |
-| `GET /api/lab/config` | The lab bundle: collector endpoint, access points, beacon plan, traffic profiles, clock policy. Authenticated (it carries AP credentials). |
+| `GET /api/lab/config` | The lab bundle: collector endpoint, access points, beacon plan, traffic profiles, clock policy, telemetry sink. Authenticated — it carries the handset **telemetry** credential (IP-133). It used to be AP passwords too; there are no access points any more, so the telemetry block is now the only secret in it and the only reason this route is behind a token. |
 | `GET /api/lab/time` | Coarse four-timestamp fallback. The real clock discipline runs over the collector's UDP socket, on the same path the data takes. |
 | `POST /api/lab/ground-truth` | Ground-truth check-in/out scans from participant devices, single or batched. Idempotent on `scan_nonce`. |
 | `GET /api/lab/ground-truth/{labSessionId}` | Live room-wide people tally for one session, per zone and overall. Cheap to poll. |
@@ -110,12 +110,29 @@ Doctrine entity — it describes physical reality and is edited next to the hard
 `config/lab/README.md` for the fields that are easy to get wrong (`collector.host` must be a
 literal IPv4; iOS monitors at most 20 beacon regions).
 
+**In production this file is generated.** Ansible renders it from
+`monad-knowledge/infra/ansible/inventory/group_vars/control.yml` → `monad_api_lab_bundle` (plus the
+`telemetry` merge below) and bind-mounts it read-only, so a hand edit on the server is reverted by
+the next `monad-api.yml` run while appearing to have worked. The copy in this repo is the local
+development one.
+
+**Three blocks are deliberately empty, as of bundle version 3 (2026-08-22).** `access_points`,
+`collector.host` and `traffic_profiles` all described the 2.4 GHz `hostapd` soft AP that was switched
+off fleet-wide on 2026-08-11 (0.62 Hz delivered against monitor-mode injection's 24.79 Hz — forty
+times worse). On 5 GHz an AP is impossible outright: Intel LAR blocks beaconing on every iwlmvm
+client card. So today there is nothing for a phone to associate to, therefore no reachable collector
+and no commandable pace — the app gates the illuminator role off on exactly those fields, and
+**a `connect_to_ap` quest step would block a run on an association that cannot happen**.
+`beacons.zones` is empty for a different reason again: the anchors are not yet reflashed to iBeacon
+or surveyed. `README.md` in that directory carries the full reasoning.
+
 **IP-133 — the bundle carries a `telemetry` block, and this API does not own it.** It names the
 public OTLP endpoint handsets ship instrument health to, plus the basic-auth credential for it.
 The phone posts **straight to Alloy**; nothing about that data path passes through here. This
-endpoint only *delivers the credential*, because the bundle is already authenticated and
-already carries AP passwords, and an app binary is readable — so a compiled-in secret would be
-a published one.
+endpoint only *delivers the credential*, because the bundle is already authenticated and an app
+binary is readable — so a compiled-in secret would be a published one. (The original wording here
+said the bundle "already carries AP passwords". It does not any more: `access_points` is empty,
+which makes this block the only secret in the bundle rather than one more.)
 
 Ansible renders the block from `vault_handset_telemetry_password`, the same variable that
 writes Alloy's htpasswd, so the two cannot disagree about the value. Rotating means running

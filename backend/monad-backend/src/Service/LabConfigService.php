@@ -14,8 +14,15 @@ use App\Exception\SystemException;
  * would add a migration to every anchor added and would put the edit behind an admin UI that does
  * not exist.
  *
- * The file is validated on read rather than trusted: a malformed bundle must fail here, with a
- * clear error, instead of reaching a phone that will silently fail to find a collector.
+ * A malformed bundle fails here rather than reaching a phone: a file that is not readable or not
+ * JSON raises, instead of being served as a partial bundle a handset would act on.
+ *
+ * Field-level validation is deliberately NOT done here. The client models every field with a
+ * default and disables the role behind it when the value is empty — an absent collector host
+ * silently gates off the illuminator, an absent beacon UUID gates off witnessing — so the useful
+ * check is "does this describe the rig", which is a human's job and lives in config/lab/README.md.
+ * A validator here would have to encode the physical deployment, which is the thing this file
+ * exists so as not to compile in.
  */
 class LabConfigService
 {
@@ -69,6 +76,21 @@ class LabConfigService
                 'tx_power' => 'medium',
             ],
             'traffic_profiles' => [],
+            // IP-133 — where the handset ships its own health while a session runs (OTLP/HTTP
+            // straight to Alloy, no application in between). Present in the default shape so the
+            // response always carries every field the client models: a bundle file written before
+            // this block existed is served with the block at its defaults rather than without the
+            // key, and a client that saw no key at all would have to guess which it was.
+            //
+            // An empty endpoint means the deployment has no public collector and the shipper stays
+            // silent. That is the correct default: the credential is real, so defaulting it to
+            // anything reachable would have a bench build authenticating against production.
+            'telemetry' => [
+                'endpoint' => '',
+                'username' => '',
+                'password' => '',
+                'flush_seconds' => 15,
+            ],
             'clock_sync' => [
                 'burst_size' => 20,
                 'burst_spacing_ms' => 50,
