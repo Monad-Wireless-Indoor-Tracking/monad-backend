@@ -55,4 +55,37 @@ class FleetController extends AbstractController
 
         return $response;
     }
+
+    /**
+     * The same fleet as curves instead of numbers.
+     *
+     * A separate route rather than a `?history=1` flag on the one above,
+     * because the two have different costs and therefore different cache
+     * windows: an instant snapshot is thirteen single-point queries, this is
+     * three range queries of 121 points each. Folding them into one response
+     * would make every live-bar refresh pay for six hours of history it does
+     * not draw.
+     *
+     * Same posture otherwise, and the posture is the point: a closed allow-list
+     * of three series, only the `host` label surviving, and an unreadable store
+     * reported as `reachable: false` rather than as flat lines at zero.
+     */
+    #[Route('/api/lab/fleet/history', name: 'api_lab_fleet_history', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/lab/fleet/history',
+        summary: 'Six hours of per-node curves for the website to draw',
+        description: 'Three allow-listed series per node — capture rate, monitor frames, SoC temperature — resampled onto one shared time grid. `from`, `step` and the array index are the whole clock; a step with no sample is `null`, which is a different fact from a zero and must be drawn as a gap. `reachable: false` means the store could not be read. Not reachable from the public Internet; the site calls it over loopback.',
+        tags: ['Lab']
+    )]
+    #[OA\Response(response: 200, description: 'Per-node history')]
+    public function history(): JsonResponse
+    {
+        $history = $this->fleet->history();
+
+        $response = $this->json($history, Response::HTTP_OK);
+        // The reader's history TTL, for the same reason as above.
+        $response->headers->set('Cache-Control', 'public, max-age=120');
+
+        return $response;
+    }
 }

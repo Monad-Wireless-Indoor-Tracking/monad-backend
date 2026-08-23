@@ -209,4 +209,110 @@ class FleetMetricsReaderTest extends TestCase
 
         self::assertSame($first, $calls, 'a cached window must cost no upstream reads');
     }
+
+    // ---------------------------------------------------------------- history
+
+    /**
+     * A range result on the grid the reader asks for. `$holes` are step indices
+     * to omit, which is how a scrape gap is expressed upstream: the point is
+     * simply absent, not zero.
+     *
+     * @param list<int> $holes
+     */
+    private static function matrix(array $metric, float $base, array $holes = []): string
+    {
+        $step = 180;
+        $to = intdiv(time(), $step) * $step;
+        $from = $to - 21600;
+        $values = [];
+        for ($i = 0; $i <= 21600 / $step; ++$i) {
+            if (in_array($i, $holes, true)) {
+                continue;
+            }
+            $values[] = [$from + $i * $step, (string) ($base + $i)];
+        }
+
+        return json_encode(['status' => 'success', 'data' => [
+            'resultType' => 'matrix',
+            'result' => [['metric' => $metric, 'values' => $values]],
+        ]]);
+    }
+
+    public function testAnUnconfiguredStoreYieldsNoCurvesRatherThanFlatOnes(): void
+    {
+        // Flat lines at zero are the curve equivalent of publishing zeros for a
+        // fleet we cannot see: plausible, drawable and false.
+        $reader = new FleetMetricsReader(new MockHttpClient(), $this->cache(), new NullLogger(), '');
+
+        $history = $reader->history();
+
+        self::assertFalse($history['reachable']);
+        self::assertSame([], $history['nodes']);
+        self::assertSame(0, $history['points']);
+    }
+
+    public function testEveryCurveLandsOnOneSharedGrid(): void
+    {
+        $history = $this->reader([
+            'monad_csi:capture_rate_hz:current' => self::matrix(['host' => 'monad02'], 100.0),
+        ])->history();
+
+        self::assertTrue($history['reachable']);
+        self::assertSame(121, $history['points']);
+        self::assertSame(180, $history['step']);
+        self::assertSame($history['to'] - $history['from'], 21600);
+        self::assertCount(121, $history['nodes']['monad02']['capture_rate_hz']);
+    }
+
+    public function testAScrapeGapIsNullAndNotZero(): void
+    {
+        // The distinction snapshot() keeps between `false` and `null`, drawn:
+        // a node switched off for an hour must not read as an hour of idling.
+        $history = $this->reader([
+            'monad_csi:capture_rate_hz:current' => self::matrix(['host' => 'monad02'], 100.0, [5, 6, 7]),
+        ])->history();
+
+        $series = $history['nodes']['monad02']['capture_rate_hz'];
+        self::assertNull($series[5]);
+        self::assertNull($series[6]);
+        self::assertSame(104.0, $series[4]);
+        self::assertSame(108.0, $series[8]);
+    }
+
+    public function testEveryNodeCarriesEveryAllowedSeries(): void
+    {
+        // So a caller cannot read "this node has no such curve" as "this key is
+        // not published". The absent one is all nulls and draws as a gap.
+        $history = $this->reader([
+            'monad_csi:capture_rate_hz:current' => self::matrix(['host' => 'monad02'], 100.0),
+        ])->history();
+
+        self::assertSame(
+            ['capture_rate_hz', 'monitor_frames_per_s', 'soc_temp_c'],
+            array_keys($history['nodes']['monad02'])
+        );
+        self::assertSame(
+            array_fill(0, 121, null),
+            $history['nodes']['monad02']['soc_temp_c']
+        );
+    }
+
+    public function testASeriesWithNoHostLabelIsDroppedNotMerged(): void
+    {
+        // Two nodes' curves averaged into one line is a reading nobody took.
+        $history = $this->reader([
+            'monad_csi:capture_rate_hz:current' => self::matrix(['instance' => '10.0.0.1:9100'], 100.0),
+            'csid_node_temp_celsius' => self::matrix(['host' => 'monad02'], 50.0),
+        ])->history();
+
+        self::assertSame(['monad02'], array_keys($history['nodes']));
+    }
+
+    public function testAWhollyUnreadableStoreIsNotPublishedAsAQuietFleet(): void
+    {
+        $client = new MockHttpClient(fn (): MockResponse => new MockResponse('nope', ['http_code' => 503]));
+        $reader = new FleetMetricsReader($client, $this->cache(), new NullLogger(), 'http://mimir:9009/prometheus');
+
+        self::assertFalse($reader->history()['reachable']);
+    }
 }

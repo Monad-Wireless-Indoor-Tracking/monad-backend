@@ -119,6 +119,50 @@ final class FleetMetricsReader
 
     private const CACHE_KEY = 'fleet_public_snapshot';
 
+    /**
+     * The three readings a node page draws as a shape rather than a number.
+     *
+     * Deliberately a *different* and much shorter list than NODE_QUERIES. An
+     * instant reading costs one point; a range costs one point per step, so the
+     * allow-list here is priced per series and holds only what a curve actually
+     * explains: how hard the node was capturing, how busy the channel was, how
+     * hot the box got. Everything else stays a number.
+     *
+     * `capture_rate_hz` carries the same caveat it does instantaneously — the
+     * fleet only delivers during a session, so a flat zero for most of a day is
+     * the truth and not a gap. Gaps are `null` (see resample()), which is a
+     * third thing again: no scrape landed in that step.
+     *
+     * @var array<string, string>
+     */
+    private const HISTORY_QUERIES = [
+        'capture_rate_hz' => 'monad_csi:capture_rate_hz:current',
+        'monitor_frames_per_s' => 'monad_nic:monitor_frames:rate5m',
+        'soc_temp_c' => 'csid_node_temp_celsius{monad_node_role="csi-node"}',
+    ];
+
+    /**
+     * Six hours, three-minute steps: 121 points per series.
+     *
+     * Chosen against what the curve has to show rather than against what Mimir
+     * can serve. Six hours spans a whole night window plus the idle hours either
+     * side, which is the shape worth seeing; three minutes is coarse enough that
+     * a scrape gap of one interval does not punch a hole in the line, and fine
+     * enough to resolve the start and end of an arm. A 15 s step over the same
+     * window would be 1 440 points nobody can see on a 200 px sparkline.
+     */
+    private const HISTORY_WINDOW_SECONDS = 21600;
+
+    private const HISTORY_STEP_SECONDS = 180;
+
+    /**
+     * Four times the instant TTL. A curve of the last six hours does not change
+     * meaningfully in two minutes, and this is the expensive read of the two.
+     */
+    private const HISTORY_CACHE_TTL_SECONDS = 120;
+
+    private const HISTORY_CACHE_KEY = 'fleet_public_history';
+
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly CacheInterface $cache,
@@ -157,6 +201,200 @@ final class FleetMetricsReader
 
             return $this->unreachable();
         }
+    }
+
+    /**
+     * The last six hours per node, as fixed-length series on one time grid.
+     *
+     * Same posture as snapshot(): a closed allow-list, only the `host` label
+     * survives, and an unreadable store says so rather than returning flat
+     * lines. The grid is shared by every series and every node so the caller
+     * can draw them against one axis without carrying timestamps per point —
+     * `from`, `step` and the array index are the whole clock.
+     *
+     * @return array{reachable: bool, read_at: int, from: int, to: int, step: int, points: int, series: list<string>, nodes: array<string, array<string, list<float|null>>>}
+     */
+    public function history(): array
+    {
+        if ('' === $this->metricsUrl) {
+            return $this->unreachableHistory();
+        }
+
+        try {
+            /** @var array{reachable: bool, read_at: int, from: int, to: int, step: int, points: int, series: list<string>, nodes: array<string, array<string, list<float|null>>>} $history */
+            $history = $this->cache->get(
+                self::HISTORY_CACHE_KEY,
+                function (ItemInterface $item): array {
+                    $item->expiresAfter(self::HISTORY_CACHE_TTL_SECONDS);
+
+                    return $this->fetchHistory();
+                }
+            );
+
+            return $history;
+        } catch (\Throwable $e) {
+            $this->logger->info('[fleet] history read failed: {msg}', ['msg' => $e->getMessage()]);
+
+            return $this->unreachableHistory();
+        }
+    }
+
+    /**
+     * @return array{reachable: bool, read_at: int, from: int, to: int, step: int, points: int, series: list<string>, nodes: array<string, array<string, list<float|null>>>}
+     */
+    private function fetchHistory(): array
+    {
+        $step = self::HISTORY_STEP_SECONDS;
+        // Snapped to the step grid so the same six hours are requested for the
+        // whole cache window. Without it every request asks for a window one
+        // second later than the last and Mimir's own result cache never hits.
+        $to = intdiv(time(), $step) * $step;
+        $from = $to - self::HISTORY_WINDOW_SECONDS;
+        $points = intdiv($to - $from, $step) + 1;
+
+        $nodes = [];
+        $ok = 0;
+        foreach (self::HISTORY_QUERIES as $key => $query) {
+            $series = $this->rangeSeries($query, $from, $to, $step);
+            if (null === $series) {
+                continue;
+            }
+            ++$ok;
+            foreach ($series as $host => $points_by_ts) {
+                $nodes[$host][$key] = $this->resample($points_by_ts, $from, $step, $points);
+            }
+        }
+
+        if (0 === $ok) {
+            // Not one range query came back. That is an unreadable store, and
+            // publishing flat lines for it would be the curve equivalent of
+            // publishing zeros for a fleet we cannot see.
+            return $this->unreachableHistory();
+        }
+
+        // Every node carries every allowed series, gaps included, so a caller
+        // cannot mistake "this node has no such curve" for "this key is not
+        // published". An absent series is an array of nulls and draws as a gap.
+        foreach ($nodes as $host => $_series) {
+            foreach (array_keys(self::HISTORY_QUERIES) as $key) {
+                $nodes[$host][$key] ??= array_fill(0, $points, null);
+            }
+            ksort($nodes[$host]);
+        }
+        ksort($nodes);
+
+        return [
+            'reachable' => true,
+            'read_at' => time(),
+            'from' => $from,
+            'to' => $to,
+            'step' => $step,
+            'points' => $points,
+            'series' => array_keys(self::HISTORY_QUERIES),
+            'nodes' => $nodes,
+        ];
+    }
+
+    /**
+     * One range query to `{host: {timestamp: value}}`. `null` marks a failed read.
+     *
+     * Same publication filter as instant(): a series carrying no `host` is
+     * dropped rather than merged, because two nodes' curves averaged into one
+     * line is a reading nobody took.
+     *
+     * @return array<string, array<int, float>>|null
+     */
+    private function rangeSeries(string $query, int $from, int $to, int $step): ?array
+    {
+        try {
+            $response = $this->http->request('GET', rtrim($this->metricsUrl, '/').'/api/v1/query_range', [
+                'query' => [
+                    'query' => $query,
+                    'start' => (string) $from,
+                    'end' => (string) $to,
+                    'step' => (string) $step,
+                ],
+                'timeout' => $this->timeoutSeconds,
+            ]);
+            $payload = $response->toArray(false);
+        } catch (\Throwable $e) {
+            $this->logger->debug('[fleet] range query failed ({q}): {msg}', ['q' => $query, 'msg' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (($payload['status'] ?? null) !== 'success') {
+            return null;
+        }
+
+        $result = $payload['data']['result'] ?? null;
+        if (!is_array($result)) {
+            return null;
+        }
+
+        $out = [];
+        foreach ($result as $series) {
+            $host = $series['metric']['host'] ?? null;
+            if (!is_string($host) || '' === $host) {
+                continue;
+            }
+            $byTs = [];
+            foreach (($series['values'] ?? []) as $pair) {
+                if (!is_array($pair) || !isset($pair[0], $pair[1])) {
+                    continue;
+                }
+                $byTs[(int) $pair[0]] = (float) $pair[1];
+            }
+            $out[$host] = $byTs;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Mimir's own points onto our grid. A step with no sample is `null`.
+     *
+     * Nulls rather than a carried-forward previous value, and rather than zero.
+     * A zero capture rate means "the recorder delivered nothing", a gap means
+     * "nothing was scraped" — the same distinction snapshot() keeps between
+     * `false` and `null`, and the reason a node that was switched off for an
+     * hour must not draw as an hour of idling.
+     *
+     * @param array<int, float> $byTs
+     *
+     * @return list<float|null>
+     */
+    private function resample(array $byTs, int $from, int $step, int $points): array
+    {
+        $out = [];
+        for ($i = 0; $i < $points; ++$i) {
+            $ts = $from + $i * $step;
+            // Mimir aligns query_range output to the step grid, so an exact hit
+            // is the normal case; the tolerance covers a store that does not.
+            $out[] = $byTs[$ts] ?? $byTs[$ts + 1] ?? $byTs[$ts - 1] ?? null;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{reachable: bool, read_at: int, from: int, to: int, step: int, points: int, series: list<string>, nodes: array<string, array<string, list<float|null>>>}
+     */
+    private function unreachableHistory(): array
+    {
+        $step = self::HISTORY_STEP_SECONDS;
+        $to = intdiv(time(), $step) * $step;
+
+        return [
+            'reachable' => false,
+            'read_at' => time(),
+            'from' => $to - self::HISTORY_WINDOW_SECONDS,
+            'to' => $to,
+            'step' => $step,
+            'points' => 0,
+            'series' => array_keys(self::HISTORY_QUERIES),
+            'nodes' => [],
+        ];
     }
 
     /**

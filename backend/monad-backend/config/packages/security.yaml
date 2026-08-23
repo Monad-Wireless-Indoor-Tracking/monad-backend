@@ -119,6 +119,11 @@ security:
         # cookie-less website a credential to store. nginx additionally 404s this
         # path on the Internet-facing vhost; the site calls it over loopback.
         - { path: ^/api/lab/fleet$, roles: PUBLIC_ACCESS }
+        # The same fleet as six hours of curves. Anchored separately rather than
+        # loosening the line above to `^/api/lab/fleet`, so that a future
+        # /api/lab/fleet/<anything> route does not inherit a public hole it was
+        # never reviewed for.
+        - { path: ^/api/lab/fleet/history$, roles: PUBLIC_ACCESS }
         - { path: ^/api/admin, roles: ROLE_SUPERADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
