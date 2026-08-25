@@ -177,7 +177,10 @@ final class QuestArmingService
             $type = $step->getType();
             // ble_advertise counts: a broadcast nobody captures awards a stamp for data never
             // recorded, which is exactly the failure the node-idle gate exists to prevent.
-            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to', 'ble_advertise'], true)) {
+            // probe counts for the same reason and more sharply: its whole output is a dwell
+            // window at a surveyed point, and a dwell no receiver heard is thirty seconds of a
+            // participant's time spent on nothing.
+            if (null !== $type && \in_array($type->value, ['sensor_capture', 'walk_to', 'ble_advertise', 'probe'], true)) {
                 return true;
             }
         }

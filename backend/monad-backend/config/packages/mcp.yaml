@@ -19,9 +19,9 @@ mcp:
 
         Quests are participant scripts. A quest is a sequence of steps; the step types are
         start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture,
-        ble_advertise, finish.
+        ble_advertise, probe, finish.
 
-        Three facts about this deployment that change what is valid:
+        Five facts about this deployment that change what is valid:
 
         1. There is no access point. AP mode is impossible on the fleet's AX210 (the Intel LAR
            firmware limit crashes the iax backport), so illumination is monitor-mode injection
@@ -34,6 +34,18 @@ mcp:
            passive BLE scan can observe it. The identity comes from the lab bundle's advertise
            namespace, never from the quest config. iOS honours it only in the foreground, and
            the quest automatically requires the ble.advertise capability.
+        4. A probe step is "scan one of these surveyed points, then hold still" — the step type
+           for a fingerprint or a treasure-hunt leg. Its targets carry a resolved label, room
+           and kind (card|node), which is why you should generate a probe quest with
+           `monad-knowledge lab quest-build` rather than hand-author it: that command reads the
+           positions out of PostGIS, so a card that moves costs a regenerate, not a hand edit
+           nothing checks.
+        5. The identity broadcast is session-scoped and every feature defaults to OFF. Declare
+           it once on the start step: config.features {broadcast, track, witness, illuminator}.
+           A probe quest without features.broadcast records dwells with nothing on air, and the
+           symptom is a gap in the trajectory rather than an error. Do not combine
+           features.broadcast with ble_advertise steps — a block-bracketing quest is correct
+           only while its on-air interval equals its labelled one.
 
     client_transports:
         http: true

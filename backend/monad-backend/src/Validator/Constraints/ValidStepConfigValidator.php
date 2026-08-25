@@ -57,7 +57,71 @@ class ValidStepConfigValidator extends ConstraintValidator
             QuestStepType::WALK_TO => $this->validateWalkToConfig($config, $constraint),
             QuestStepType::SENSOR_CAPTURE => $this->validateSensorCaptureConfig($config, $constraint),
             QuestStepType::BLE_ADVERTISE => $this->validateBleAdvertiseConfig($config, $constraint),
+            QuestStepType::PROBE => $this->validateProbeConfig($config, $constraint),
         };
+    }
+
+    /**
+     * IP-140 — a probe names the surveyed points it will accept, and how long to stand there.
+     *
+     * `targets` is validated structurally rather than against a table: the authority for which
+     * codes exist is `infra/labels/*.toml` on the monad-knowledge side, and this service has no
+     * access to it. `lab quest-check` is what fails when a quest names a card that was never
+     * printed or never placed.
+     */
+    private function validateProbeConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::PROBE->value;
+
+        $this->requirePositiveInteger($config, 'dwell_seconds', $type, $constraint);
+
+        if (!isset($config['targets'])) {
+            $this->context->buildViolation($constraint->messageMissingField)
+                ->setParameter('{{ field }}', 'targets')
+                ->setParameter('{{ type }}', $type)
+                ->addViolation();
+
+            return;
+        }
+
+        if (!is_array($config['targets']) || $config['targets'] === []) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'targets')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'must be a non-empty list of targets')
+                ->addViolation();
+
+            return;
+        }
+
+        // `kind` is closed. A dwell at a node sticker sits at zero distance from one end of every
+        // link that node terminates, which is the degenerate corner of the geometry; a dwell at a
+        // marker card samples open floor. Pooling the two produces an uninterpretable statistic,
+        // so the tag has to be present and has to be one of two values.
+        $allowedKinds = ['card', 'node'];
+
+        foreach (array_values($config['targets']) as $index => $target) {
+            if (!is_array($target)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', sprintf('targets[%d]', $index))
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be an object')
+                    ->addViolation();
+                continue;
+            }
+
+            foreach (['value', 'label', 'room'] as $field) {
+                $this->requireString($target, $field, $type, $constraint);
+            }
+
+            if (!isset($target['kind']) || !in_array($target['kind'], $allowedKinds, true)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', sprintf('targets[%d].kind', $index))
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be one of: card, node')
+                    ->addViolation();
+            }
+        }
     }
 
     private function validateSensorCaptureConfig(array $config, ValidStepConfig $constraint): void
@@ -153,16 +217,38 @@ class ValidStepConfigValidator extends ConstraintValidator
         // No validation needed for empty config
     }
 
+    /**
+     * IP-140 — the credential belongs to the lab bundle, never to a quest.
+     *
+     * Step config is served to every authenticated caller, so a password here is a published
+     * password. `ap_id` selects which of the bundle's access points to join; the SSID and the key
+     * are read from the bundle at run time, which is the same rule `ble_advertise` already follows
+     * for the advertise namespace.
+     */
     private function validateConnectToApConfig(array $config, ValidStepConfig $constraint): void
     {
         $type = QuestStepType::CONNECT_TO_AP->value;
 
-        // Required fields
-        $this->requireString($config, 'ssid', $type, $constraint);
+        $this->requireString($config, 'ap_id', $type, $constraint);
 
-        // Optional fields
-        if (isset($config['password'])) {
-            $this->validateString($config, 'password', $type, $constraint);
+        if (array_key_exists('password', $config)) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'password')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'must not be authored into a quest — step config is '
+                    . 'served to every authenticated caller, so the credential comes from the lab '
+                    . 'bundle via ap_id')
+                ->addViolation();
+        }
+
+        if (array_key_exists('ssid', $config)) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'ssid')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'is read from the lab bundle, not from the quest — '
+                    . 'two sources for one SSID means the quest can name a network the handset '
+                    . 'cannot be given a key for')
+                ->addViolation();
         }
     }
 

@@ -19,5 +19,19 @@ enum QuestStepType: string
      */
     case BLE_ADVERTISE = 'ble_advertise';
 
+    /**
+     * IP-140 — scan one of a named set of surveyed points, then hold still for a fixed dwell.
+     *
+     * The difference from `scan_qr` is that a probe knows *where* the code is. Its `targets` carry
+     * a resolved label, room and kind, generated from the PostGIS placement layouts, so a matched
+     * scan yields a position rather than only a step completion. The dwell is bracketed with
+     * `dwell_start` / `dwell_end` session markers.
+     *
+     * It never starts or stops the identity broadcast. That is session-scoped and declared in the
+     * start step's `features` block, so the frame stays on air across the walk between two probes —
+     * which is the part of the record the fleet's per-node RSSI reconstructs a trajectory from.
+     */
+    case PROBE = 'probe';
+
     case FINISH = 'finish';
 }

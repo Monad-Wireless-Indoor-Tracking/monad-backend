@@ -113,15 +113,37 @@ class LabTools
         description: <<<'TXT'
             Create or replace a quest by name. Steps are [{order, name, type, config}]; types are
             start, wait, scan_qr, connect_to_ap, walk_to, find_ble_device, sensor_capture,
-            ble_advertise, finish.
-            Do NOT author connect_to_ap on this deployment: there is no AP to associate to and the
-            run would block. A scan_qr step needs config.expected_value — that string is what the
-            participant's scan is matched against, and lab_marker_svg renders it.
+            ble_advertise, probe, finish.
+
+            Prefer `monad-knowledge lab quest-build` over hand-authoring a probe quest. It reads the
+            surveyed placements out of PostGIS and writes the targets, so a card that moves costs a
+            regenerate rather than a hand edit that nothing checks.
+
+            A probe step (IP-140) is "scan one of these surveyed points, then hold still". It needs
+            config.dwell_seconds and config.targets, each target {value, label, room, kind} with
+            kind one of card|node. One target makes a treasure-hunt leg; many make a fingerprint
+            probe that accepts whichever code the participant is standing at. A probe does NOT put
+            the radio on air — see the features block below.
+
+            The identity broadcast is SESSION-scoped, declared once on the start step as
+            config.features {broadcast, track, witness, illuminator}. Every field defaults to false,
+            so a quest that wants the frame on air across the whole run must say so. That is what
+            keeps the trajectory between two probes recorded, and it is why a probe quest without
+            features.broadcast records dwells with nothing broadcasting.
+
+            A scan_qr step needs config.expected_value — that string is what the participant's scan
+            is matched against, and lab_marker_svg renders it.
+
             A ble_advertise step needs config.duration_seconds; it broadcasts the lab identity
             frame (derived from the bundle's advertise namespace, never authored into the quest)
             and iOS honours it only while the app is in the foreground. The quest's
             required_capabilities gains "ble.advertise" automatically, so handsets that cannot
-            broadcast are never offered it.
+            broadcast are never offered it. Do not combine it with features.broadcast: a
+            block-bracketing quest is correct only when the on-air interval equals the labelled one.
+
+            Do NOT author connect_to_ap on this deployment: there is no AP to associate to and the
+            run would block. Its credential comes from the bundle via config.ap_id, never from the
+            quest — step config is served to every authenticated caller.
             TXT,
     )]
     public function questWrite(
@@ -158,6 +180,12 @@ class LabTools
 
         $warnings = [];
         $requiredCapabilities = [];
+        // The one cross-step check worth making here: a probe records a dwell, and a dwell with
+        // nothing on air is a participant standing still for thirty seconds for no reason. The
+        // symptom is a gap in the trajectory rather than an error, so it has to be caught at
+        // authoring time.
+        $hasProbe = false;
+        $broadcastDeclared = false;
 
         if ($existed) {
             foreach ($quest->getSteps()->toArray() as $old) {
@@ -196,6 +224,35 @@ class LabTools
                 );
             }
 
+            if ($type === QuestStepType::PROBE) {
+                $requiredCapabilities[] = 'ble.advertise';
+                $requiredCapabilities[] = 'camera.qr';
+                $hasProbe = true;
+
+                if (($config['targets'] ?? []) === []) {
+                    $warnings[] = sprintf(
+                        'Step %d is a probe with no targets: nothing can satisfy it.',
+                        $i,
+                    );
+                }
+                foreach ((array) ($config['targets'] ?? []) as $t) {
+                    if (!is_array($t) || !in_array($t['kind'] ?? null, ['card', 'node'], true)) {
+                        $warnings[] = sprintf(
+                            'Step %d has a target with no kind (card|node). A dwell at a node sits '
+                            . 'at zero distance from one link end and cannot be pooled with one on '
+                            . 'open floor, so the analysis needs the tag.',
+                            $i,
+                        );
+                        break;
+                    }
+                }
+            }
+
+            if ($type === QuestStepType::START) {
+                $features = (array) ($config['features'] ?? []);
+                $broadcastDeclared = ($features['broadcast'] ?? false) === true;
+            }
+
             $step = new QuestStep();
             $step->setName($data['name'] ?? null);
             $step->setType($type);
@@ -203,6 +260,13 @@ class LabTools
             $step->setConfig($config);
             $quest->addStep($step);
             $this->entityManager->persist($step);
+        }
+
+        if ($hasProbe && !$broadcastDeclared) {
+            $warnings[] = 'This quest has probe steps but its start step does not declare '
+                . 'features.broadcast. Every feature defaults to false, so the identity frame will '
+                . 'never go on air and each dwell records a participant standing still while no '
+                . 'receiver can hear them. Add {"features": {"broadcast": true}} to the start step.';
         }
 
         $quest->setRequiredCapabilities($requiredCapabilities);

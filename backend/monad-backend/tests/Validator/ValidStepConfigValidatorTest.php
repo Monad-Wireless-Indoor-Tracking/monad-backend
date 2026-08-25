@@ -119,4 +119,116 @@ class ValidStepConfigValidatorTest extends TestCase
         ]);
         self::assertNotEmpty($messages);
     }
+
+    // ── probe (IP-140) ──────────────────────────────────────────────────────────────────────
+
+    /** @return array<string, mixed> */
+    private static function probeTarget(array $overrides = []): array
+    {
+        return $overrides + [
+            'value' => 'https://monad.dubec.dev/m/MONAD-FP-07',
+            'label' => 'Fingerprint point 07',
+            'room' => 'library-open',
+            'kind' => 'card',
+        ];
+    }
+
+    public function testProbeAcceptsAGeneratedTarget(): void
+    {
+        self::assertSame([], $this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [self::probeTarget()],
+        ]));
+    }
+
+    public function testProbeAcceptsManyTargets(): void
+    {
+        self::assertSame([], $this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [
+                self::probeTarget(),
+                self::probeTarget([
+                    'value' => 'https://monad.dubec.dev/d/monad04',
+                    'label' => 'Node monad04',
+                    'kind' => 'node',
+                ]),
+            ],
+        ]));
+    }
+
+    public function testProbeRequiresADwell(): void
+    {
+        $messages = $this->violationMessages('probe', ['targets' => [self::probeTarget()]]);
+        self::assertNotEmpty($messages);
+        self::assertStringContainsString('dwell_seconds', $messages[0]);
+    }
+
+    public function testProbeRejectsAnEmptyTargetList(): void
+    {
+        // A probe with nothing to match is a card a participant stands in front of forever.
+        self::assertNotEmpty($this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [],
+        ]));
+    }
+
+    public function testProbeRejectsAnUntaggedTarget(): void
+    {
+        // The kind is not decoration. A dwell at a node sits at zero distance from one end of
+        // every link that node terminates; a dwell at a card samples open floor. Pooling the two
+        // produces a statistic nobody can interpret, so the tag is mandatory.
+        $target = self::probeTarget();
+        unset($target['kind']);
+
+        self::assertNotEmpty($this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [$target],
+        ]));
+    }
+
+    public function testProbeRejectsAnUnknownKind(): void
+    {
+        self::assertNotEmpty($this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [self::probeTarget(['kind' => 'beacon'])],
+        ]));
+    }
+
+    public function testProbeRejectsATargetWithNoRoom(): void
+    {
+        // A target with no room resolves to a scan that names no place, which is the whole
+        // difference between a probe and a scan_qr.
+        $target = self::probeTarget();
+        unset($target['room']);
+
+        self::assertNotEmpty($this->violationMessages('probe', [
+            'dwell_seconds' => 30,
+            'targets' => [$target],
+        ]));
+    }
+
+    // ── connect_to_ap (IP-140): the credential is the bundle's, never the quest's ───────────
+
+    public function testConnectToApRejectsAnAuthoredPassword(): void
+    {
+        // Step config is served to every authenticated caller, so a password here is published.
+        $messages = $this->violationMessages('connect_to_ap', [
+            'ap_id' => 'lab-ap',
+            'password' => 'hunter2',
+        ]);
+        self::assertNotEmpty($messages);
+    }
+
+    public function testConnectToApRejectsAnAuthoredSsid(): void
+    {
+        self::assertNotEmpty($this->violationMessages('connect_to_ap', [
+            'ap_id' => 'lab-ap',
+            'ssid' => 'monad-lab',
+        ]));
+    }
+
+    public function testConnectToApAcceptsABundleReference(): void
+    {
+        self::assertSame([], $this->violationMessages('connect_to_ap', ['ap_id' => 'lab-ap']));
+    }
 }
