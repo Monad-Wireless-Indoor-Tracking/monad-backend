@@ -6,7 +6,13 @@ use App\Constants\ErrorCode;
 use App\Exception\SystemException;
 use App\Exception\ValidationException;
 use AsyncAws\Core\Exception\Http\HttpException;
+use AsyncAws\S3\Input\AbortMultipartUploadRequest;
+use AsyncAws\S3\Input\CompleteMultipartUploadRequest;
+use AsyncAws\S3\Input\CreateMultipartUploadRequest;
 use AsyncAws\S3\Input\PutObjectRequest;
+use AsyncAws\S3\Input\UploadPartRequest;
+use AsyncAws\S3\ValueObject\CompletedMultipartUpload;
+use AsyncAws\S3\ValueObject\CompletedPart;
 use AsyncAws\S3\S3Client;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Uid\Uuid;
@@ -14,6 +20,18 @@ use Symfony\Component\Uid\Uuid;
 class S3Service
 {
     private const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+
+    /**
+     * Smallest interior part S3 accepts, 5 MiB. Protocol, not policy — the last part may be smaller.
+     *
+     * Published to the client as `partSizeHint` so the part size lives in one place. The client
+     * currently sends 8 MiB parts, which is above this floor and small enough that losing one costs
+     * a few seconds on a phone uplink.
+     */
+    private const MIN_PART_SIZE = 5 * 1024 * 1024;
+
+    /** S3's part-number ceiling. At the 5 MiB floor this bounds one object at ~48 GB. */
+    private const MAX_PARTS = 10_000;
     private const ALLOWED_CONTENT_TYPES = [
         'application/octet-stream',
         'application/json',
@@ -340,6 +358,11 @@ class S3Service
         string $contentType,
         int $contentLength,
         string $userId,
+        // Read `$body` below and never declared until 2026-08-26: PHP resolved it as an undefined
+        // variable, which evaluates to null, so the stream branch happened to be taken and the bug
+        // was invisible. Declared rather than removed, so the two direct-upload methods have the
+        // same shape and a caller that has already consumed php://input can say so.
+        ?string $body = null,
     ): array {
         $this->validateUploadRequest($filename, $contentType, $contentLength);
 
@@ -442,6 +465,207 @@ class S3Service
                 ErrorCode::STORAGE_UPLOAD_FAILED,
                 previous: $e
             );
+        }
+    }
+
+    /**
+     * The object key one lab-session artefact lands on. Derived, never accepted from a client.
+     *
+     * Public because the multipart path needs the *same* key on three separate requests, and a key
+     * the client carried between them would be a client-chosen write path into the bucket.
+     */
+    public function sessionObjectKey(string $participantId, string $sessionId, string $filename): string
+    {
+        return sprintf(
+            'datasets/monad-app-sessions/%s/%s/%s',
+            $this->sanitizeIdentifier($participantId),
+            $this->sanitizeIdentifier($sessionId),
+            $this->sanitizeFilename($filename)
+        );
+    }
+
+    /**
+     * Open a multipart upload for one lab-session artefact.
+     *
+     * WHY THIS EXISTS. The single-body path above works up to the point where the *transport* gives
+     * out, not the point where the server refuses. On 2026-08-26 a 21-minute survey walk uploaded
+     * nine artefacts and lost two: `mesh.ply` (102.94 MB) and `worldmap.armap` (30.05 MB), with no
+     * error in the app, in this application, or in the bucket. nginx admits 520 MB and PHP admits
+     * 500 MB, so nothing here rejected them — the phone's connection dropped mid-body and the four
+     * client retries each restarted the same doomed 103 MB request.
+     *
+     * A multipart upload changes the unit of loss. A dropped connection costs one part, the retry
+     * re-sends that part alone, and the parts that already landed stay landed. That is the whole
+     * property; the S3 protocol is incidental.
+     *
+     * @return array{uploadId: string, objectKey: string, partSizeHint: int}
+     */
+    public function beginSessionMultipart(
+        string $filename,
+        string $contentType,
+        int $totalBytes,
+        string $participantId,
+        string $sessionId,
+    ): array {
+        $this->validateUploadRequest($filename, $contentType, $totalBytes);
+
+        $objectKey = $this->sessionObjectKey($participantId, $sessionId, $filename);
+
+        try {
+            $created = $this->s3Client->createMultipartUpload(new CreateMultipartUploadRequest([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'ContentType' => $contentType,
+            ]));
+            $uploadId = (string) $created->getUploadId();
+        } catch (HttpException $e) {
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED, previous: $e);
+        }
+
+        if ($uploadId === '') {
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED);
+        }
+
+        return [
+            'uploadId' => $uploadId,
+            'objectKey' => $objectKey,
+            'partSizeHint' => self::MIN_PART_SIZE,
+        ];
+    }
+
+    /**
+     * Stream one part from php://input into an open multipart upload.
+     *
+     * The part number is 1-based and every part except the last must be at least
+     * [self::MIN_PART_SIZE]; that is an S3 rule rather than a choice here, and violating it fails at
+     * *complete* time rather than at upload time, which is the worst place to discover it. So it is
+     * checked here, where the request that broke it can be named.
+     *
+     * @return array{partNumber: int, etag: string, size: int}
+     */
+    public function uploadSessionPart(
+        string $filename,
+        int $contentLength,
+        string $participantId,
+        string $sessionId,
+        string $uploadId,
+        int $partNumber,
+        bool $isLastPart,
+    ): array {
+        if ($partNumber < 1 || $partNumber > self::MAX_PARTS) {
+            throw new ValidationException(ErrorCode::STORAGE_PART_NUMBER_INVALID);
+        }
+        if ($contentLength <= 0 || $contentLength > self::MAX_FILE_SIZE) {
+            throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
+        }
+        if (!$isLastPart && $contentLength < self::MIN_PART_SIZE) {
+            // Rejected here rather than at complete time: S3 reports an undersized interior part as
+            // an EntityTooSmall failure on CompleteMultipartUpload, by which point the client has
+            // spent the whole transfer and has no way to tell which part was wrong.
+            throw new ValidationException(ErrorCode::STORAGE_PART_TOO_SMALL);
+        }
+
+        $objectKey = $this->sessionObjectKey($participantId, $sessionId, $filename);
+        $inputStream = fopen('php://input', 'rb');
+
+        try {
+            $uploaded = $this->s3Client->uploadPart(new UploadPartRequest([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'UploadId' => $uploadId,
+                'PartNumber' => $partNumber,
+                'Body' => $inputStream,
+                'ContentLength' => $contentLength,
+            ]));
+            $etag = (string) $uploaded->getETag();
+        } catch (HttpException $e) {
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED, previous: $e);
+        } finally {
+            if (is_resource($inputStream)) {
+                fclose($inputStream);
+            }
+        }
+
+        if ($etag === '') {
+            // A part with no ETag cannot be named in the completion manifest, so it is a failure
+            // even though the request succeeded. Silence here would produce a "complete" call that
+            // omits a part and an object short by 8 MB.
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED);
+        }
+
+        return ['partNumber' => $partNumber, 'etag' => $etag, 'size' => $contentLength];
+    }
+
+    /**
+     * Seal a multipart upload. The manifest is the client's part list, in ascending part order.
+     *
+     * @param list<array{partNumber: int, etag: string}> $parts
+     * @return array{success: bool, objectKey: string, url: string, parts: int}
+     */
+    public function completeSessionMultipart(
+        string $filename,
+        string $participantId,
+        string $sessionId,
+        string $uploadId,
+        array $parts,
+    ): array {
+        if ($parts === []) {
+            throw new ValidationException(ErrorCode::STORAGE_PART_MANIFEST_EMPTY);
+        }
+
+        $objectKey = $this->sessionObjectKey($participantId, $sessionId, $filename);
+
+        usort($parts, static fn (array $a, array $b): int => $a['partNumber'] <=> $b['partNumber']);
+        $completed = [];
+        foreach ($parts as $part) {
+            $completed[] = new CompletedPart([
+                'PartNumber' => (int) $part['partNumber'],
+                'ETag' => (string) $part['etag'],
+            ]);
+        }
+
+        try {
+            $this->s3Client->completeMultipartUpload(new CompleteMultipartUploadRequest([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'UploadId' => $uploadId,
+                'MultipartUpload' => new CompletedMultipartUpload(['Parts' => $completed]),
+            ]))->resolve();
+        } catch (HttpException $e) {
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED, previous: $e);
+        }
+
+        return [
+            'success' => true,
+            'objectKey' => $objectKey,
+            'url' => $this->objectUrl($objectKey),
+            'parts' => count($completed),
+        ];
+    }
+
+    /**
+     * Discard an open multipart upload and the parts it holds.
+     *
+     * Called when the client gives up. Not housekeeping: an abandoned multipart upload keeps its
+     * uploaded parts in the bucket and they are billed, invisible to every `ListObjects` view, until
+     * a lifecycle rule reaps them. A client that walks out of the room mid-upload is the normal
+     * case here, so the abort is part of the protocol rather than a tidy-up.
+     */
+    public function abortSessionMultipart(
+        string $filename,
+        string $participantId,
+        string $sessionId,
+        string $uploadId,
+    ): void {
+        $objectKey = $this->sessionObjectKey($participantId, $sessionId, $filename);
+        try {
+            $this->s3Client->abortMultipartUpload(new AbortMultipartUploadRequest([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+                'UploadId' => $uploadId,
+            ]))->resolve();
+        } catch (HttpException $e) {
+            throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED, previous: $e);
         }
     }
 

@@ -524,6 +524,312 @@ class S3Controller extends AbstractController
         return $this->json($result, Response::HTTP_OK);
     }
 
+    /**
+     * The multipart family: begin, part, complete, abort.
+     *
+     * FOUR ROUTES RATHER THAN ONE, AND WHY. The single-body `session-upload` above is correct for a
+     * TSV and wrong for a mesh, and the boundary is the transport rather than any limit this
+     * application sets. On 2026-08-26 a survey walk lost `mesh.ply` (102.94 MB) and
+     * `worldmap.armap` (30.05 MB) while nine smaller artefacts went up cleanly: the phone's
+     * connection dropped mid-body and each of the four client retries restarted the same doomed
+     * request. Nothing rejected them — nginx admits 520 MB, PHP admits 500 MB, and the bucket never
+     * saw a byte.
+     *
+     * What multipart changes is the unit of loss: a dropped connection costs one part, and the retry
+     * re-sends that part alone.
+     *
+     * **The object key is never accepted from the client.** Every one of the four requests carries
+     * `X-Filename` / `X-Session-Id` / `X-Participant-Id` and the key is re-derived from them with
+     * the same sanitizers the single-body path uses. A client-carried key would be a client-chosen
+     * write path into the project's bucket.
+     */
+    #[Route('/api/storage/session-upload/begin', name: 'api_storage_session_upload_begin', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/storage/session-upload/begin',
+        summary: 'Open a multipart upload for one large lab-session artefact',
+        description: 'Opens an S3 multipart upload and returns its id plus the derived object key. Use for artefacts too large to survive a single request (mesh.ply, worldmap.armap); small streams should keep using POST /api/storage/session-upload. Send X-Total-Bytes so the size is validated before any part is transferred.',
+        security: [['Bearer' => []]],
+        tags: ['Storage']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Multipart upload opened',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'uploadId', type: 'string', example: '2~abc123'),
+                new OA\Property(property: 'objectKey', type: 'string', example: 'datasets/monad-app-sessions/p-1/s-1/mesh.ply'),
+                new OA\Property(property: 'partSizeHint', type: 'integer', example: 5242880, description: 'Smallest interior part S3 will accept'),
+            ]
+        )
+    )]
+    public function sessionUploadBegin(Request $request): JsonResponse
+    {
+        [$filename, $sessionId, $participantId] = $this->sessionArtefactIdentity($request);
+        $contentType = $request->headers->get('X-Artefact-Content-Type', 'application/octet-stream');
+        $totalBytes = (int) $request->headers->get('X-Total-Bytes', '0');
+
+        if ($totalBytes <= 0) {
+            throw new ValidationException(ErrorCode::STORAGE_FILE_TOO_LARGE);
+        }
+
+        $result = $this->s3Service->beginSessionMultipart(
+            filename: $filename,
+            contentType: $contentType,
+            totalBytes: $totalBytes,
+            participantId: $participantId,
+            sessionId: $sessionId,
+        );
+
+        $this->logger->info(
+            '[lab-upload] multipart OPENED: {artefact} for session {session_id} '
+            . '({bytes} bytes, participant {participant}, upload {upload_id})',
+            [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'bytes' => $totalBytes,
+                'upload_id' => $result['uploadId'],
+            ]
+        );
+
+        return $this->json($result, Response::HTTP_OK);
+    }
+
+    #[Route('/api/storage/session-upload/part', name: 'api_storage_session_upload_part', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/storage/session-upload/part',
+        summary: 'Stream one part of an open multipart upload',
+        description: 'Raw binary body, streamed straight to object storage. Part numbers are 1-based and every part except the last must be at least 5 MiB. Returns the ETag the completion manifest needs.',
+        security: [['Bearer' => []]],
+        tags: ['Storage']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Part stored',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'partNumber', type: 'integer', example: 3),
+                new OA\Property(property: 'etag', type: 'string', example: '"9b2cf5…"'),
+                new OA\Property(property: 'size', type: 'integer', example: 8388608),
+            ]
+        )
+    )]
+    public function sessionUploadPart(Request $request): JsonResponse
+    {
+        [$filename, $sessionId, $participantId] = $this->sessionArtefactIdentity($request);
+        $uploadId = (string) $request->headers->get('X-Upload-Id', '');
+        $partNumber = (int) $request->headers->get('X-Part-Number', '0');
+        $isLastPart = $request->headers->get('X-Last-Part') === 'true';
+        $contentLength = (int) $request->headers->get('Content-Length', '0');
+
+        if ($uploadId === '') {
+            throw new ValidationException(ErrorCode::STORAGE_UPLOAD_ID_REQUIRED);
+        }
+
+        $startedAt = microtime(true);
+        try {
+            $result = $this->s3Service->uploadSessionPart(
+                filename: $filename,
+                contentLength: $contentLength,
+                participantId: $participantId,
+                sessionId: $sessionId,
+                uploadId: $uploadId,
+                partNumber: $partNumber,
+                isLastPart: $isLastPart,
+            );
+        } catch (\Throwable $e) {
+            // Counted against the artefact, not against a synthetic "part" name: the operator's
+            // question is which ARTEFACT is failing, and a per-part metric name would make one
+            // stuck mesh look like thirteen unrelated failures.
+            $this->telemetry->artefactFailed($filename);
+            $this->logger->error(
+                '[lab-upload] part FAILED: {artefact} part {part} for session {session_id} '
+                . '({bytes} bytes, participant {participant}): {error}',
+                [
+                    'session_id' => $sessionId,
+                    'participant' => $participantId,
+                    'artefact' => $filename,
+                    'part' => $partNumber,
+                    'bytes' => $contentLength,
+                    'error' => $e->getMessage(),
+                ]
+            );
+            throw $e;
+        }
+
+        $this->logger->info(
+            '[lab-upload] part stored: {artefact} part {part} for session {session_id} '
+            . '({bytes} bytes, {seconds}s, participant {participant}, last={last})',
+            [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'part' => $partNumber,
+                'bytes' => $contentLength,
+                'seconds' => round(microtime(true) - $startedAt, 3),
+                'last' => $isLastPart ? 'true' : 'false',
+            ]
+        );
+
+        return $this->json($result, Response::HTTP_OK);
+    }
+
+    #[Route('/api/storage/session-upload/complete', name: 'api_storage_session_upload_complete', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/storage/session-upload/complete',
+        summary: 'Seal a multipart upload',
+        description: 'JSON body {"uploadId": "…", "parts": [{"partNumber": 1, "etag": "…"}, …]}. Parts may arrive in any order; they are sorted before the manifest is built.',
+        security: [['Bearer' => []]],
+        tags: ['Storage']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Object assembled',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'objectKey', type: 'string', example: 'datasets/monad-app-sessions/p-1/s-1/mesh.ply'),
+                new OA\Property(property: 'url', type: 'string'),
+                new OA\Property(property: 'parts', type: 'integer', example: 13),
+            ]
+        )
+    )]
+    public function sessionUploadComplete(Request $request): JsonResponse
+    {
+        [$filename, $sessionId, $participantId] = $this->sessionArtefactIdentity($request);
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            throw new ValidationException(ErrorCode::STORAGE_PART_MANIFEST_EMPTY);
+        }
+        $uploadId = (string) ($payload['uploadId'] ?? '');
+        if ($uploadId === '') {
+            throw new ValidationException(ErrorCode::STORAGE_UPLOAD_ID_REQUIRED);
+        }
+        $parts = [];
+        foreach ((array) ($payload['parts'] ?? []) as $part) {
+            if (!is_array($part) || !isset($part['partNumber'], $part['etag'])) {
+                continue;
+            }
+            $parts[] = ['partNumber' => (int) $part['partNumber'], 'etag' => (string) $part['etag']];
+        }
+
+        $startedAt = microtime(true);
+        try {
+            $result = $this->s3Service->completeSessionMultipart(
+                filename: $filename,
+                participantId: $participantId,
+                sessionId: $sessionId,
+                uploadId: $uploadId,
+                parts: $parts,
+            );
+        } catch (\Throwable $e) {
+            $this->telemetry->artefactFailed($filename);
+            $this->logger->error(
+                '[lab-upload] multipart COMPLETE FAILED: {artefact} for session {session_id} '
+                . '({parts} part(s), participant {participant}): {error}',
+                [
+                    'session_id' => $sessionId,
+                    'participant' => $participantId,
+                    'artefact' => $filename,
+                    'parts' => count($parts),
+                    'error' => $e->getMessage(),
+                ]
+            );
+            throw $e;
+        }
+        $elapsed = microtime(true) - $startedAt;
+
+        // Counted here and nowhere else on this path. `artefactStored` is what says an artefact
+        // reached the archive, and on a multipart upload that is true at completion, not at the
+        // last part — a part list that never completes leaves no object behind.
+        $totalBytes = (int) $request->headers->get('X-Total-Bytes', '0');
+        $this->telemetry->artefactAccepted($filename);
+        $this->telemetry->artefactStored($filename, $totalBytes, $elapsed);
+
+        $this->logger->info(
+            '[lab-upload] artefact stored (multipart): {artefact} for session {session_id} '
+            . '({bytes} bytes, {parts} part(s), {seconds}s, participant {participant})',
+            [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'bytes' => $totalBytes,
+                'parts' => $result['parts'],
+                'seconds' => round($elapsed, 3),
+            ]
+        );
+
+        return $this->json($result, Response::HTTP_OK);
+    }
+
+    #[Route('/api/storage/session-upload/abort', name: 'api_storage_session_upload_abort', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/storage/session-upload/abort',
+        summary: 'Discard an open multipart upload and its parts',
+        description: 'JSON body {"uploadId": "…"}. Call this when the client gives up: abandoned parts stay in the bucket, are billed, and are invisible to an object listing.',
+        security: [['Bearer' => []]],
+        tags: ['Storage']
+    )]
+    #[OA\Response(response: 200, description: 'Upload discarded')]
+    public function sessionUploadAbort(Request $request): JsonResponse
+    {
+        [$filename, $sessionId, $participantId] = $this->sessionArtefactIdentity($request);
+        $payload = json_decode($request->getContent(), true);
+        $uploadId = is_array($payload) ? (string) ($payload['uploadId'] ?? '') : '';
+        if ($uploadId === '') {
+            throw new ValidationException(ErrorCode::STORAGE_UPLOAD_ID_REQUIRED);
+        }
+
+        $this->s3Service->abortSessionMultipart(
+            filename: $filename,
+            participantId: $participantId,
+            sessionId: $sessionId,
+            uploadId: $uploadId,
+        );
+
+        $this->logger->warning(
+            '[lab-upload] multipart ABORTED: {artefact} for session {session_id} '
+            . '(participant {participant}, upload {upload_id}) — the client gave up, '
+            . 'the artefact is still on the phone',
+            [
+                'session_id' => $sessionId,
+                'participant' => $participantId,
+                'artefact' => $filename,
+                'upload_id' => $uploadId,
+            ]
+        );
+
+        return $this->json(['success' => true], Response::HTTP_OK);
+    }
+
+    /**
+     * The three identifiers every session-artefact request carries, validated once.
+     *
+     * @return array{0: string, 1: string, 2: string} filename, sessionId, participantId
+     */
+    private function sessionArtefactIdentity(Request $request): array
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw new AuthException(ErrorCode::AUTH_UNAUTHORIZED);
+        }
+
+        $filename = $request->headers->get('X-Filename');
+        $sessionId = $request->headers->get('X-Session-Id');
+        if (!$filename) {
+            throw new ValidationException(ErrorCode::STORAGE_FILENAME_REQUIRED);
+        }
+        if (!$sessionId) {
+            throw new ValidationException(ErrorCode::STORAGE_EXPERIMENT_ID_REQUIRED);
+        }
+
+        // Same fallback as the single-body path: the client may carry its own pseudonym, and the
+        // authenticated user id stands in so a session can never land on an unattributable prefix.
+        $participantId = $request->headers->get('X-Participant-Id') ?: $user->getId()->toRfc4122();
+
+        return [$filename, $sessionId, $participantId];
+    }
+
     #[Route('/api/storage/test', name: 'api_storage_test', methods: ['GET'])]
     #[OA\Get(
         path: '/api/storage/test',

@@ -49,6 +49,10 @@ class ErrorCode
     public const STORAGE_FILENAME_REQUIRED = 'STORAGE_303';
     public const STORAGE_S3_UNAVAILABLE = 'STORAGE_304';
     public const STORAGE_EXPERIMENT_ID_REQUIRED = 'STORAGE_305';
+    public const STORAGE_UPLOAD_ID_REQUIRED = 'STORAGE_306';
+    public const STORAGE_PART_NUMBER_INVALID = 'STORAGE_307';
+    public const STORAGE_PART_TOO_SMALL = 'STORAGE_308';
+    public const STORAGE_PART_MANIFEST_EMPTY = 'STORAGE_309';
 
     // Lab Errors (400-499)
     public const LAB_GROUND_TRUTH_EMPTY_BATCH = 'LAB_400';
@@ -96,6 +100,10 @@ class ErrorCode
             self::STORAGE_FILENAME_REQUIRED => 'Filename is required',
             self::STORAGE_S3_UNAVAILABLE => 'Storage service is temporarily unavailable',
             self::STORAGE_EXPERIMENT_ID_REQUIRED => 'Experiment ID is required',
+            self::STORAGE_UPLOAD_ID_REQUIRED => 'Multipart upload id is required',
+            self::STORAGE_PART_NUMBER_INVALID => 'Part number must be between 1 and 10000',
+            self::STORAGE_PART_TOO_SMALL => 'Every part except the last must be at least 5 MiB',
+            self::STORAGE_PART_MANIFEST_EMPTY => 'The completion manifest names no parts',
 
             self::LAB_GROUND_TRUTH_EMPTY_BATCH => 'No ground-truth events in request',
             self::LAB_GROUND_TRUTH_BATCH_TOO_LARGE => 'Too many ground-truth events in one request',
