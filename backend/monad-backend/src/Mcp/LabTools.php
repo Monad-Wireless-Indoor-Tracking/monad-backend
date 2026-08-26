@@ -42,20 +42,45 @@ class LabTools
      */
     #[McpTool(
         name: 'lab_quest_list',
-        description: 'List all quests: name, availability window, estimated duration and step count.',
+        description: <<<'TXT'
+            List all quests with their status, window, points, duration and step count.
+
+            `status` is the field to read: `live` (a participant can run it now), `scheduled`
+            (opens later) or `hidden` (its window has closed). It is computed against the clock,
+            so a listing never needs two timestamps compared by hand to answer "is this on?".
+
+            Change any of it with lab_quest_update, which never touches the steps.
+            TXT,
     )]
     public function questList(): array
     {
         $quests = $this->entityManager->getRepository(Quest::class)->findBy([], ['availableFrom' => 'DESC']);
 
-        return ['quests' => array_map(fn (Quest $q): array => [
+        $rows = array_map(fn (Quest $q): array => [
             'name' => $q->getName(),
+            // First, because it is the question. Two timestamps are the evidence for it,
+            // and a reader should not have to do the comparison to learn whether anybody
+            // can run the thing right now.
+            'status' => self::describeWindow($q),
+            'points' => $q->getPoints(),
             'available_from' => $q->getAvailableFrom()?->format(\DateTimeInterface::ATOM),
             'available_to' => $q->getAvailableTo()?->format(\DateTimeInterface::ATOM),
             'estimated_duration' => $q->getEstimatedDuration(),
             'steps' => $q->getSteps()->count(),
             'created_by' => $q->getCreatedBy()?->getEmail(),
-        ], $quests)];
+        ], $quests);
+
+        $live = array_values(array_filter($rows, static fn (array $r): bool => $r['status'] === 'live'));
+
+        return [
+            'quests' => $rows,
+            // The summary an operator actually opens this tool for.
+            'summary' => [
+                'total' => count($rows),
+                'live' => count($live),
+                'live_names' => array_column($live, 'name'),
+            ],
+        ];
     }
 
     /**
@@ -296,6 +321,154 @@ class LabTools
         $this->entityManager->flush();
 
         return ['deleted' => $name];
+    }
+
+    /**
+     * Change anything on the quest **row**, and nothing on its steps.
+     *
+     * The tool for a quest somebody has already run. `quest_enrollments.quest_id` and
+     * `quest_step_completions.step_id` both carry no `ON DELETE` clause, so Postgres
+     * refuses to drop a quest that holds run records — the database protecting
+     * measurement provenance, and exactly right. The same guard means
+     * `lab_quest_write` cannot be used to re-time one either: it replaces the step
+     * rows, and those rows are what the completions point at.
+     *
+     * So every quest-row field lives here, in **one** tool rather than one tool per
+     * field. `lab_quest_retire`, `lab_quest_schedule` and `lab_quest_points` would
+     * have been three write paths to one row, and the second one written would
+     * eventually disagree with the first about what "not offered" means.
+     *
+     * Only fields that are passed are changed. Omitting one leaves it alone, which is
+     * what makes "hide this" a single argument rather than a read-modify-write.
+     *
+     * @return array<string, mixed>
+     */
+    #[McpTool(
+        name: 'lab_quest_update',
+        description: <<<'TXT'
+            Change a quest's window, points, description or duration WITHOUT touching its steps.
+
+            This is the tool for a quest somebody has already run. lab_quest_delete refuses those
+            — the database will not drop a quest holding run records — and lab_quest_write cannot
+            re-time one either, because it replaces the step rows the completions point at.
+
+            Only the fields you pass are changed. Everything else is left alone.
+
+            To HIDE a quest:            available_to = "now"
+            To re-open one:             available_to = "never"   (clears the end date)
+            To schedule a close:        available_to = "2027-06-30T23:59:00+00:00"
+            To open it later:           available_from = "2026-09-01T06:00:00+00:00"
+            To arm or disarm points:    points = 120   /   points = 0
+
+            Dates are anything PHP's DateTime parses: "now", "+2 weeks", an ISO timestamp. The
+            literal "never" is the one special value and it clears available_to.
+
+            A hidden quest keeps its enrolments, its step completions and its history. It simply
+            stops being offered, which is what hiding means when the data has to survive.
+            TXT,
+    )]
+    public function questUpdate(
+        string $name,
+        ?string $available_from = null,
+        ?string $available_to = null,
+        ?float $points = null,
+        ?string $description = null,
+        ?int $estimated_duration = null,
+    ): array {
+        $quest = $this->entityManager->getRepository(Quest::class)->findOneBy(['name' => $name]);
+        if ($quest === null) {
+            return ['error' => sprintf('No quest named "%s".', $name)];
+        }
+
+        $changed = [];
+
+        if ($available_from !== null) {
+            try {
+                $opensAt = new \DateTime($available_from);
+            } catch (\Exception $e) {
+                return ['error' => 'Unparseable available_from: ' . $e->getMessage()];
+            }
+            $quest->setAvailableFrom($opensAt);
+            $changed['available_from'] = $opensAt->format(\DateTimeInterface::ATOM);
+        }
+
+        if ($available_to !== null) {
+            // "never" clears the end date. Spelled as a word rather than as an empty
+            // string, because an empty string is what a mis-wired caller sends by
+            // accident and re-opening a retired quest should never be accidental.
+            if (strtolower(trim($available_to)) === 'never') {
+                $quest->setAvailableTo(null);
+                $changed['available_to'] = null;
+            } else {
+                try {
+                    $closesAt = new \DateTime($available_to);
+                } catch (\Exception $e) {
+                    return ['error' => 'Unparseable available_to: ' . $e->getMessage()];
+                }
+                $quest->setAvailableTo($closesAt);
+                $changed['available_to'] = $closesAt->format(\DateTimeInterface::ATOM);
+            }
+        }
+
+        if ($points !== null) {
+            if ($points < 0) {
+                return ['error' => 'points must be zero or positive.'];
+            }
+            $quest->setPoints($points);
+            $changed['points'] = $points;
+        }
+
+        if ($description !== null) {
+            if (trim($description) === '') {
+                return ['error' => 'description cannot be blank.'];
+            }
+            $quest->setDescription($description);
+            $changed['description'] = $description;
+        }
+
+        if ($estimated_duration !== null) {
+            if ($estimated_duration <= 0) {
+                return ['error' => 'estimated_duration must be a positive number of minutes.'];
+            }
+            $quest->setEstimatedDuration($estimated_duration);
+            $changed['estimated_duration'] = $estimated_duration;
+        }
+
+        if ($changed === []) {
+            return ['error' => 'Nothing to change. Pass at least one field.'];
+        }
+
+        $this->entityManager->flush();
+
+        return [
+            'updated' => $name,
+            'changed' => $changed,
+            'status' => self::describeWindow($quest),
+            'note' => 'Steps, enrolments and step completions untouched.',
+        ];
+    }
+
+    /**
+     * Where a quest stands relative to now, as one word.
+     *
+     * `available_from` / `available_to` are two timestamps a reader has to compare
+     * against the clock in their head before they know whether anybody can run the
+     * thing. That comparison is the question, so the answer travels with the data.
+     */
+    private static function describeWindow(Quest $quest): string
+    {
+        $now = new \DateTimeImmutable();
+        $from = $quest->getAvailableFrom();
+        $to = $quest->getAvailableTo();
+
+        if ($from !== null && $from > $now) {
+            return 'scheduled';
+        }
+        if ($to !== null && $to < $now) {
+            return 'hidden';
+        }
+
+        return 'live';
     }
 
     /**

@@ -207,6 +207,56 @@ class ValidStepConfigValidatorTest extends TestCase
         ]));
     }
 
+    // ── observe (IP-140): the human headcount ───────────────────────────────────────────────
+
+    public function testObserveAcceptsAMinimalConfig(): void
+    {
+        self::assertSame([], $this->violationMessages('observe', [
+            'prompt' => 'How many people can you see right now?',
+            'min_readings' => 5,
+        ]));
+    }
+
+    public function testObserveRequiresAPrompt(): void
+    {
+        // The step is a question. Without one the widget shows a number and no
+        // reason to touch it, and two participants answer two different questions.
+        self::assertNotEmpty($this->violationMessages('observe', ['min_readings' => 5]));
+    }
+
+    public function testObserveRequiresAReadingCountWithNoDefault(): void
+    {
+        // A count step that silently accepts one reading and completes is the
+        // difference between a measurement and an anecdote. The author has to say.
+        $messages = $this->violationMessages('observe', ['prompt' => 'How many?']);
+        self::assertNotEmpty($messages);
+        self::assertStringContainsString('min_readings', $messages[0]);
+    }
+
+    public function testObserveRejectsZeroReadings(): void
+    {
+        self::assertNotEmpty($this->violationMessages('observe', [
+            'prompt' => 'How many?',
+            'min_readings' => 0,
+        ]));
+    }
+
+    public function testObserveAcceptsAnOptionalCeiling(): void
+    {
+        // Optional on purpose: a room whose capacity nobody has stated must not
+        // get a fabricated one from this validator.
+        self::assertSame([], $this->violationMessages('observe', [
+            'prompt' => 'How many?',
+            'min_readings' => 3,
+            'max_count' => 60,
+        ]));
+        self::assertNotEmpty($this->violationMessages('observe', [
+            'prompt' => 'How many?',
+            'min_readings' => 3,
+            'max_count' => 0,
+        ]));
+    }
+
     // ── connect_to_ap (IP-140): the credential is the bundle's, never the quest's ───────────
 
     public function testConnectToApRejectsAnAuthoredPassword(): void

@@ -33,5 +33,21 @@ enum QuestStepType: string
      */
     case PROBE = 'probe';
 
+    /**
+     * IP-140 — ask the participant for a number they can see, several times over.
+     *
+     * The one channel that counts *people* rather than phones. Every other stream in
+     * this lab observes a handset: BLE sees an advertiser, CSI sees a body it cannot
+     * name, and both undercount anybody without the app. A human looking up and
+     * counting is the only measurement that does not share that bias, which is why
+     * it must never be derived from the others — the gap between them is itself the
+     * quantity a later experiment sets out to measure.
+     *
+     * One step yields many readings: the participant walks, and records a count
+     * wherever they stop. Each one lands on the session timeline as a marker, so it
+     * joins the radio record on the same clock.
+     */
+    case OBSERVE = 'observe';
+
     case FINISH = 'finish';
 }

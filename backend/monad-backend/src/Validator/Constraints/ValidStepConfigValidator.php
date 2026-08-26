@@ -58,7 +58,31 @@ class ValidStepConfigValidator extends ConstraintValidator
             QuestStepType::SENSOR_CAPTURE => $this->validateSensorCaptureConfig($config, $constraint),
             QuestStepType::BLE_ADVERTISE => $this->validateBleAdvertiseConfig($config, $constraint),
             QuestStepType::PROBE => $this->validateProbeConfig($config, $constraint),
+            QuestStepType::OBSERVE => $this->validateObserveConfig($config, $constraint),
         };
+    }
+
+    /**
+     * IP-140 — the human headcount step.
+     *
+     * `min_readings` is required and has no default on purpose. A count step that
+     * silently accepts one reading and completes is the difference between a
+     * measurement and an anecdote, and the number of readings is a design decision
+     * the quest author has to make out loud.
+     */
+    private function validateObserveConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::OBSERVE->value;
+
+        $this->requireString($config, 'prompt', $type, $constraint);
+        $this->requirePositiveInteger($config, 'min_readings', $type, $constraint);
+
+        // An upper bound on the counter, so a fat finger cannot enter 400 people
+        // into a room with 83 seats. Optional: a room whose capacity nobody has
+        // stated should not get a fabricated one here.
+        if (isset($config['max_count'])) {
+            $this->validatePositiveInteger($config, 'max_count', $type, $constraint);
+        }
     }
 
     /**
