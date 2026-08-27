@@ -19,7 +19,7 @@
 
 services:
   api:
-    image: ${MONAD_API_IMAGE:-ghcr.io/monad-wireless-indoor-tracking/monad-backend:main}
+    image: ${MONAD_API_IMAGE:-ghcr.io/monad-wireless/monad-backend:main}
     container_name: monad_api
     restart: unless-stopped
     environment:
