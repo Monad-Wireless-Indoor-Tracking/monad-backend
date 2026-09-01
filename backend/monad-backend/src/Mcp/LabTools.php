@@ -62,6 +62,10 @@ class LabTools
             // and a reader should not have to do the comparison to learn whether anybody
             // can run the thing right now.
             'status' => self::describeWindow($q),
+            // IP-145. Listed because its absence is what made a broken re-scope expensive to
+            // find: an operator quest and a public one looked identical here, so the only way
+            // to check the gate was to read the whole quest back or hit the public API.
+            'audience' => $q->getAudience(),
             'points' => $q->getPoints(),
             'available_from' => $q->getAvailableFrom()?->format(\DateTimeInterface::ATOM),
             'available_to' => $q->getAvailableTo()?->format(\DateTimeInterface::ATOM),
@@ -477,17 +481,22 @@ class LabTools
             if ($estimated_duration <= 0) {
                 return ['error' => 'estimated_duration must be a positive number of minutes.'];
             }
+            $quest->setEstimatedDuration($estimated_duration);
+            $changed['estimated_duration'] = $estimated_duration;
+        }
 
         // IP-145. The one field you actually want to change on a quest somebody has already
         // run: `lab_quest_write` replaces the step rows their completions point at, and the
         // FK on quest_step_completions.step_id has no ON DELETE clause, so such a write is
         // refused by the database rather than silently destructive. Re-scoping has to happen
         // here instead.
+        //
+        // Recorded in `$changed` like every other field. Without that the caller is told
+        // "updated" with the audience absent from the list, which reads as "already set"
+        // rather than "not applied" — and that is exactly how this shipped once already.
         if ($audience !== null) {
             $quest->setAudience($audience);
-        }
-            $quest->setEstimatedDuration($estimated_duration);
-            $changed['estimated_duration'] = $estimated_duration;
+            $changed['audience'] = $quest->getAudience();
         }
 
         if ($changed === []) {

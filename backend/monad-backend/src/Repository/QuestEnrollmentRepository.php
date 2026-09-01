@@ -231,7 +231,7 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
      * @return array{
      *   points_total: float,
      *   quests_completed: int,
-     *   contribution: array{dwells: int, dwell_seconds: int, distinct_points: int},
+     *   contribution: array{dwells: int, dwell_seconds: int, distinct_points: int, points_visited: list<string>},
      *   history: list<array{quest: string, completed_at: string|null, points: float|null}>
      * }
      */
@@ -264,7 +264,7 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
         // because an abandoned dwell produced no usable window.
         $dwells = 0;
         $dwellSeconds = 0;
-        $points = [];
+        $points = [];  // key => true, sorted at the end
         $history = [];
 
         foreach ($completed as $enrollment) {
@@ -284,8 +284,17 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
                 ++$dwells;
                 $dwellSeconds += $elapsed;
                 foreach ((array) ($step->getStepData()['targets'] ?? []) as $target) {
-                    if (is_string($target) && $target !== '') {
-                        $points[$target] = true;
+                    if (!is_string($target) || $target === '') {
+                        continue;
+                    }
+                    // The bare key, not the scanned payload. A target is recorded as the URL
+                    // printed on the card (`https://…/m/MONAD-FP-01`), and the coverage plan
+                    // is drawn from surveyed point KEYS. Taking the last path segment keeps
+                    // the payload grammar in one place — the printed registry — instead of
+                    // teaching this repository a second copy of it.
+                    $key = substr(strrchr($target, '/') ?: ('/' . $target), 1);
+                    if ($key !== '') {
+                        $points[$key] = true;
                     }
                 }
             }
@@ -297,6 +306,8 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
             ];
         }
 
+        ksort($points);
+
         return [
             'points_total' => $total,
             'quests_completed' => count($completed),
@@ -304,6 +315,10 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
                 'dwells' => $dwells,
                 'dwell_seconds' => $dwellSeconds,
                 'distinct_points' => count($points),
+                // The keys themselves, so the app can draw the coverage plan. Sorted so two
+                // requests that saw the same points produce the same URL, which is what makes
+                // that image cacheable.
+                'points_visited' => array_values(array_map('strval', array_keys($points))),
             ],
             'history' => $history,
         ];

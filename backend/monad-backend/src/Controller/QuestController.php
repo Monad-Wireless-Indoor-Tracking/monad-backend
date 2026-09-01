@@ -19,6 +19,7 @@ use App\Entity\User;
 use App\Enum\QuestEnrollmentStatus;
 use App\Enum\QuestStepCompletionStatus;
 use App\Quest\QuestArmingService;
+use App\Quest\RealisedRoute;
 use App\Quest\QuestAvailability;
 use App\Repository\DeviceRepository;
 use App\Repository\QuestEnrollmentRepository;
@@ -474,11 +475,19 @@ class QuestController extends AbstractController
         );
         $enrollment->setDataPath($dataPath);
 
-        // Create quest step completions for all steps
-        $steps = $quest->getSteps();
+        // The steps THIS enrollment walks (IP-145). For a quest without a pool that is every
+        // declared step in its declared order, which is every quest before IP-145.
+        //
+        // A completion row is created only for the steps actually served. Creating them for
+        // the declared set would mean a pooled run could never reach 100%, and the fifteen
+        // stops it was never asked to walk would sit unfinished forever.
+        $steps = RealisedRoute::apply(
+            $quest->getSteps()->toArray(),
+            $enrollment->getRealisedSteps(),
+        );
         $stepDtos = [];
 
-        foreach ($steps as $step) {
+        foreach ($steps as $index => $step) {
             $stepCompletion = new QuestStepCompletion();
             $stepCompletion->setEnrollment($enrollment);
             $stepCompletion->setStep($step);
@@ -486,8 +495,10 @@ class QuestController extends AbstractController
             $enrollment->addStepCompletion($stepCompletion);
             $entityManager->persist($stepCompletion);
 
-            // Create DTO for response
-            $stepDtos[] = QuestStartStepDto::fromEntities($step, $stepCompletion);
+            // Renumbered to the realised sequence. The step ROWS are shared by every
+            // enrollment and must keep their declared order; the sequence this walker was
+            // asked for is a property of the response.
+            $stepDtos[] = QuestStartStepDto::fromEntities($step, $stepCompletion, $index);
         }
 
         // Persist enrollment
