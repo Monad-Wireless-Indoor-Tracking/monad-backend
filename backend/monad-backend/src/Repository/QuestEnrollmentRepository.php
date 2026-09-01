@@ -232,7 +232,8 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
      *   points_total: float,
      *   quests_completed: int,
      *   contribution: array{dwells: int, dwell_seconds: int, distinct_points: int, points_visited: list<string>},
-     *   history: list<array{quest: string, completed_at: string|null, points: float|null}>
+     *   history: list<array{quest: string, completed_at: string|null, points: float|null}>,
+     *   activity: list<array{date: string, dwells: int}>
      * }
      */
     public function statsForUser(User $user): array
@@ -266,6 +267,10 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
         $dwellSeconds = 0;
         $points = [];  // key => true, sorted at the end
         $history = [];
+        // Dwells per calendar day, for the activity chart. Keyed by Y-m-d and filled in
+        // below so a quiet day is a zero-height bar rather than a missing one: a chart that
+        // silently drops empty days compresses a fortnight of nothing into a solid week.
+        $perDay = [];
 
         foreach ($completed as $enrollment) {
             foreach ($enrollment->getStepCompletions() as $step) {
@@ -283,6 +288,8 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
                 }
                 ++$dwells;
                 $dwellSeconds += $elapsed;
+                $day = $completedAt->format('Y-m-d');
+                $perDay[$day] = ($perDay[$day] ?? 0) + 1;
                 foreach ((array) ($step->getStepData()['targets'] ?? []) as $target) {
                     if (!is_string($target) || $target === '') {
                         continue;
@@ -308,6 +315,17 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
 
         ksort($points);
 
+        // Six weeks, oldest first, EVERY day present. Matches the window the sibling study
+        // app charts, so a screenshot of one sits beside the other without an axis argument.
+        $activity = [];
+        $cursor = new \DateTimeImmutable('-41 days');
+        $today = new \DateTimeImmutable('today');
+        while ($cursor <= $today) {
+            $day = $cursor->format('Y-m-d');
+            $activity[] = ['date' => $day, 'dwells' => $perDay[$day] ?? 0];
+            $cursor = $cursor->modify('+1 day');
+        }
+
         return [
             'points_total' => $total,
             'quests_completed' => count($completed),
@@ -321,6 +339,7 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
                 'points_visited' => array_values(array_map('strval', array_keys($points))),
             ],
             'history' => $history,
+            'activity' => $activity,
         ];
     }
 
