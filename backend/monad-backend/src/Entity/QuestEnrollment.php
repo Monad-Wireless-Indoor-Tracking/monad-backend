@@ -6,6 +6,7 @@ use App\Enum\QuestEnrollmentStatus;
 use App\Repository\QuestEnrollmentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -14,6 +15,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'quest_enrollments')]
 #[ORM\Index(name: 'enrollment_status_idx', columns: ['status'])]
 #[ORM\Index(name: 'user_quest_idx', columns: ['user_id', 'quest_id'])]
+#[ORM\Index(name: 'enrollment_user_awarded_idx', columns: ['user_id', 'awarded_at'])]
 #[ORM\HasLifecycleCallbacks]
 class QuestEnrollment
 {
@@ -66,6 +68,45 @@ class QuestEnrollment
 
     #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
     private ?\DateTimeImmutable $createdAt = null;
+
+    /**
+     * The target keys this enrollment was actually asked to walk, in order (IP-145).
+     *
+     * NULL means the quest's declared step order was served, which is every
+     * enrollment before IP-145 and every enrollment on a `fixed` quest.
+     *
+     * The SEQUENCE is stored rather than the random seed that produced it. A seed
+     * only reproduces an order against a frozen generator, and the generator here is
+     * not frozen: `loop_order` gained door awareness on 2026-09-01 and will change
+     * again. A few hundred bytes buys an answer to "what was this walker actually
+     * told to do" that survives any future change to the ordering code.
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(name: 'realised_steps', type: Types::JSON, nullable: true)]
+    private ?array $realisedSteps = null;
+
+    /**
+     * What this completion was worth, frozen when it completed (IP-145).
+     *
+     * Frozen rather than derived from `quests.points`, because that column is
+     * mutable and a derived total silently rewrites history the first time a quest
+     * is re-valued. Before IP-145 there was no ledger at all: the completion
+     * response returned the quest's current value and stored nothing.
+     */
+    #[ORM\Column(name: 'points_awarded', type: Types::FLOAT, nullable: true)]
+    private ?float $pointsAwarded = null;
+
+    /**
+     * When the award was frozen.
+     *
+     * Equal to `completed_at` to the second means the row was BACKFILLED by
+     * Version20260901150000 rather than stamped at the time. Nothing recorded what
+     * those walkers were promised, so the backfill is a reconstruction and any
+     * pre/post analysis must exclude those rows.
+     */
+    #[ORM\Column(name: 'awarded_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $awardedAt = null;
 
     #[ORM\OneToMany(targetEntity: QuestStepCompletion::class, mappedBy: 'enrollment', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $stepCompletions;
@@ -209,4 +250,53 @@ class QuestEnrollment
 
         return $this;
     }
+
+    /**
+     * @return list<string>|null
+     */
+    public function getRealisedSteps(): ?array
+    {
+        return $this->realisedSteps;
+    }
+
+    /**
+     * @param list<string>|null $realisedSteps
+     */
+    public function setRealisedSteps(?array $realisedSteps): static
+    {
+        $this->realisedSteps = ($realisedSteps === null || $realisedSteps === []) ? null : $realisedSteps;
+
+        return $this;
+    }
+
+    public function getPointsAwarded(): ?float
+    {
+        return $this->pointsAwarded;
+    }
+
+    public function getAwardedAt(): ?\DateTimeImmutable
+    {
+        return $this->awardedAt;
+    }
+
+    /**
+     * Freeze what this completion was worth. Idempotent, and deliberately one-way.
+     *
+     * A second call is ignored rather than overwriting. Re-completing, a replayed
+     * request, or a later re-valuation of the quest must not change what a finished
+     * walk was worth: that is the entire reason the value is stored here instead of
+     * being read from `quests.points` when someone asks for a total.
+     */
+    public function awardPoints(float $points, ?\DateTimeImmutable $at = null): static
+    {
+        if ($this->pointsAwarded !== null) {
+            return $this;
+        }
+
+        $this->pointsAwarded = $points;
+        $this->awardedAt = $at ?? new \DateTimeImmutable();
+
+        return $this;
+    }
+
 }

@@ -224,4 +224,89 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    /**
+     * Everything a profile screen shows, for one user (IP-145).
+     *
+     * @return array{
+     *   points_total: float,
+     *   quests_completed: int,
+     *   contribution: array{dwells: int, dwell_seconds: int, distinct_points: int},
+     *   history: list<array{quest: string, completed_at: string|null, points: float|null}>
+     * }
+     */
+    public function statsForUser(User $user): array
+    {
+        // The total sums the FROZEN award, never `quests.points`. Re-valuing a quest must not
+        // change what a finished walk was worth, which is the entire reason the value lives on
+        // the enrollment.
+        $total = (float) ($this->createQueryBuilder('e')
+            ->select('COALESCE(SUM(e.pointsAwarded), 0)')
+            ->andWhere('e.user = :user')
+            ->andWhere('e.status = :completed')
+            ->setParameter('user', $user)
+            ->setParameter('completed', QuestEnrollmentStatus::COMPLETED)
+            ->getQuery()
+            ->getSingleScalarResult());
+
+        /** @var list<QuestEnrollment> $completed */
+        $completed = $this->createQueryBuilder('e')
+            ->andWhere('e.user = :user')
+            ->andWhere('e.status = :completed')
+            ->setParameter('user', $user)
+            ->setParameter('completed', QuestEnrollmentStatus::COMPLETED)
+            ->orderBy('e.completedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        // The contribution block, and it is the one worth building: it answers "what did my
+        // walking produce" rather than "what is my score". Counted over COMPLETED steps only,
+        // because an abandoned dwell produced no usable window.
+        $dwells = 0;
+        $dwellSeconds = 0;
+        $points = [];
+        $history = [];
+
+        foreach ($completed as $enrollment) {
+            foreach ($enrollment->getStepCompletions() as $step) {
+                $startedAt = $step->getStartedAt();
+                $completedAt = $step->getCompletedAt();
+                if ($startedAt === null || $completedAt === null) {
+                    continue;
+                }
+                $elapsed = $completedAt->getTimestamp() - $startedAt->getTimestamp();
+                // A negative or absurd span is a clock artefact, not a dwell. Dropped rather
+                // than clamped: a summed total that quietly absorbed a bad row would read as
+                // a participant having contributed time they did not.
+                if ($elapsed < 0 || $elapsed > 3600) {
+                    continue;
+                }
+                ++$dwells;
+                $dwellSeconds += $elapsed;
+                foreach ((array) ($step->getStepData()['targets'] ?? []) as $target) {
+                    if (is_string($target) && $target !== '') {
+                        $points[$target] = true;
+                    }
+                }
+            }
+
+            $history[] = [
+                'quest' => $enrollment->getQuest()?->getName() ?? 'Unknown quest',
+                'completed_at' => $enrollment->getCompletedAt()?->format(\DateTimeInterface::ATOM),
+                'points' => $enrollment->getPointsAwarded(),
+            ];
+        }
+
+        return [
+            'points_total' => $total,
+            'quests_completed' => count($completed),
+            'contribution' => [
+                'dwells' => $dwells,
+                'dwell_seconds' => $dwellSeconds,
+                'distinct_points' => count($points),
+            ],
+            'history' => $history,
+        ];
+    }
+
 }
