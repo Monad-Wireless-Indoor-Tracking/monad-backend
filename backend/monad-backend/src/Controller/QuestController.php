@@ -69,7 +69,8 @@ class QuestController extends AbstractController
                             new OA\Property(property: 'description', type: 'string', example: 'Explore the main campus buildings and learn about university history', description: 'Quest description'),
                             new OA\Property(property: 'points', type: 'number', format: 'float', example: 100.0, description: 'Points awarded for completing this quest'),
                             new OA\Property(property: 'estimatedDuration', type: 'integer', nullable: true, example: 30, description: 'Estimated duration in minutes'),
-                            new OA\Property(property: 'numberOfSteps', type: 'integer', example: 5, description: 'Number of steps in this quest')
+                            new OA\Property(property: 'numberOfSteps', type: 'integer', example: 5, description: 'Number of steps in this quest'),
+                            new OA\Property(property: 'audience', type: 'string', enum: ['public', 'operator'], example: 'public', description: 'Who this quest is for. Only a superadmin ever receives an `operator` row.')
                         ],
                         type: 'object'
                     )
