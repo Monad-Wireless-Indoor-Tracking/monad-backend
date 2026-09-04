@@ -6,6 +6,7 @@ use App\Constants\ErrorCode;
 use App\Entity\User;
 use App\Exception\AuthException;
 use App\Exception\ValidationException;
+use App\Service\LabSessionRegister;
 use App\Service\LabTelemetry;
 use App\Service\S3Service;
 use Psr\Log\LoggerInterface;
@@ -24,6 +25,7 @@ class S3Controller extends AbstractController
     public function __construct(
         private S3Service $s3Service,
         private LabTelemetry $telemetry,
+        private LabSessionRegister $register,
         private LoggerInterface $logger,
     ) {
     }
@@ -491,6 +493,15 @@ class S3Controller extends AbstractController
             $this->telemetry->sessionCompleted($sidecar);
         }
 
+        // IP-149 — the register. AFTER the S3 write succeeded and in the same request,
+        // so a failure here is a logged 500 the client retries, never a session that
+        // exists on S3 with no row. The sidecar completes the row; every other
+        // artefact adds itself to it.
+        $this->register->artefactStored($sessionId, $participantId, $user, $filename, $contentLength, $contentType, 'single');
+        if ($sidecar !== null) {
+            $this->register->sessionCompleted($sessionId, $participantId, $user, $sidecar);
+        }
+
         // The counter above says how many artefacts arrived; it cannot say WHICH, for WHICH session,
         // or how big. This hop — phone to archive — is the most fragile step in the whole instrument
         // and until now it wrote nothing to the journal: on 2026-08-19 the `api` service produced 37
@@ -745,6 +756,27 @@ class S3Controller extends AbstractController
         $totalBytes = (int) $request->headers->get('X-Total-Bytes', '0');
         $this->telemetry->artefactAccepted($filename);
         $this->telemetry->artefactStored($filename, $totalBytes, $elapsed);
+
+        // IP-149 — same register entry the single-body path writes, so a mesh that
+        // arrived in parts and a TSV that arrived whole are one kind of row. A sidecar
+        // is a few kB and takes the single-body path by client contract; if one ever
+        // arrives in parts it is read back from the object just sealed.
+        $user = $this->getUser();
+        $this->register->artefactStored(
+            $sessionId,
+            $participantId,
+            $user instanceof User ? $user : null,
+            $filename,
+            $totalBytes,
+            (string) $request->headers->get('X-Artefact-Content-Type', 'application/octet-stream'),
+            'multipart',
+        );
+        if ($filename === 'metadata.json') {
+            $raw = $this->s3Service->getSessionObject($participantId, $sessionId, $filename, self::MAX_INSPECTABLE_SIDECAR);
+            if ($raw !== null) {
+                $this->register->sessionCompleted($sessionId, $participantId, $user instanceof User ? $user : null, $raw);
+            }
+        }
 
         $this->logger->info(
             '[lab-upload] artefact stored (multipart): {artefact} for session {session_id} '

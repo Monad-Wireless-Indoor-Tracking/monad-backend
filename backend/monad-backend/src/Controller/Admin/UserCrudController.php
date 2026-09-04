@@ -65,8 +65,14 @@ class UserCrudController extends AbstractCrudController
             ->displayIf(static fn (User $user) => !$user->isDeleted())
             ->addCssClass('text-danger');
 
+        // IP-149 — the participant's runs, sessions, handsets and contribution, on one page.
+        $participant = Action::new('participant', 'Runs', 'fa fa-person-walking')
+            ->linkToRoute('admin_participant', static fn (User $u) => ['id' => $u->getId()?->toRfc4122()]);
+
         return $actions
             ->add(Crud::PAGE_INDEX, Action::DETAIL)
+            ->add(Crud::PAGE_INDEX, $participant)
+            ->add(Crud::PAGE_DETAIL, $participant)
             ->add(Crud::PAGE_INDEX, $anonymise)
             ->add(Crud::PAGE_DETAIL, $anonymise)
             // Hard delete is off: see the class comment. Anonymise is the supported path.

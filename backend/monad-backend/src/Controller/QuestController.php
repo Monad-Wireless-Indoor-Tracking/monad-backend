@@ -18,6 +18,8 @@ use App\Entity\QuestStepSkipRecord;
 use App\Entity\User;
 use App\Enum\QuestEnrollmentStatus;
 use App\Enum\QuestStepCompletionStatus;
+use App\Quest\HandsetDescriptor;
+use App\Quest\HandsetRegistry;
 use App\Quest\QuestArmingService;
 use App\Quest\RealisedRoute;
 use App\Quest\QuestAvailability;
@@ -257,9 +259,37 @@ class QuestController extends AbstractController
     #[OA\Post(
         path: '/api/quest/{id}/start',
         summary: 'Start a quest',
-        description: 'Creates a quest enrollment for the authenticated user and initializes all quest step completions',
+        description: 'Creates a quest enrollment for the authenticated user and initializes all quest step completions. The optional body carries the handset descriptor (IP-149): what phone is walking this run, frozen on the enrollment as measurement provenance. An empty body is an app build that predates the descriptor and stays valid.',
         security: [['Bearer' => []]],
         tags: ['Quest']
+    )]
+    #[OA\RequestBody(
+        required: false,
+        description: 'Optional. `{"handset": {...}}` — the phone describing itself. Closed top-level keys: handset_id, platform (ios|android), machine, manufacturer, model, soc, os_version, os_build, app_version, build_id, capabilities (string list), sensors (list), radio (object), state (object). Unknown keys are rejected (400 VALIDATION_108); bodies over 64 kB are rejected (400 VALIDATION_109).',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'handset',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'handset_id', type: 'string', example: '0b6f2a8e-8c1d-4e2a-9f3b-1c2d3e4f5a6b'),
+                        new OA\Property(property: 'platform', type: 'string', enum: ['ios', 'android']),
+                        new OA\Property(property: 'machine', type: 'string', example: 'iPhone15,2'),
+                        new OA\Property(property: 'manufacturer', type: 'string', example: 'Apple'),
+                        new OA\Property(property: 'model', type: 'string', example: 'iPhone'),
+                        new OA\Property(property: 'soc', type: 'string', nullable: true),
+                        new OA\Property(property: 'os_version', type: 'string', example: '18.6'),
+                        new OA\Property(property: 'os_build', type: 'string', example: '22G86'),
+                        new OA\Property(property: 'app_version', type: 'string', example: '1.4.0'),
+                        new OA\Property(property: 'build_id', type: 'string', example: '1.4.0+41.g9a1d2f2b'),
+                        new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'sensors', type: 'array', items: new OA\Items(type: 'object')),
+                        new OA\Property(property: 'radio', type: 'object'),
+                        new OA\Property(property: 'state', type: 'object'),
+                    ]
+                ),
+            ]
+        )
     )]
     #[OA\Parameter(
         name: 'id',
@@ -337,6 +367,7 @@ class QuestController extends AbstractController
         DeviceRepository $deviceRepository,
         QuestEnrollmentRepository $enrollmentRepository,
         QuestArmingService $arming,
+        HandsetRegistry $handsets,
         EntityManagerInterface $entityManager
     ): JsonResponse {
         // Check authentication
@@ -346,6 +377,12 @@ class QuestController extends AbstractController
                 'error' => 'Authentication required'
             ], Response::HTTP_UNAUTHORIZED);
         }
+
+        // IP-149 — the phone describing itself. Parsed BEFORE any database work so a
+        // malformed body costs a 400 and not a half-written enrollment. Null is an app
+        // build that sent no body, and that stays valid; the descriptor's own validator
+        // raises the 400 (VALIDATION_108 / _109) for anything present and wrong.
+        $handsetDescriptor = HandsetDescriptor::fromRequestBody($request->getContent());
 
         // Validate UUID format
         try {
@@ -448,6 +485,13 @@ class QuestController extends AbstractController
         $enrollment->setQuest($quest);
         $enrollment->setDevice($device);
         $enrollment->setCompletedAt(null);
+
+        // IP-149 — freeze the transmitter beside the receiver. The handset row is
+        // found-or-created in the same unit of work as the enrollment, so a failure
+        // after this point leaves neither. The snapshot is the body as received.
+        if ($handsetDescriptor !== null) {
+            $enrollment->attachHandset($handsets->observe($handsetDescriptor), $handsetDescriptor->toArray());
+        }
 
         // Realise the route, once, here (IP-145). A quest with a pool gives a different
         // order to each enrollment; one without gives null and the declared step order is

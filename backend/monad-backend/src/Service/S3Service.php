@@ -9,6 +9,8 @@ use AsyncAws\Core\Exception\Http\HttpException;
 use AsyncAws\S3\Input\AbortMultipartUploadRequest;
 use AsyncAws\S3\Input\CompleteMultipartUploadRequest;
 use AsyncAws\S3\Input\CreateMultipartUploadRequest;
+use AsyncAws\S3\Input\GetObjectRequest;
+use AsyncAws\S3\Input\ListObjectsV2Request;
 use AsyncAws\S3\Input\PutObjectRequest;
 use AsyncAws\S3\Input\UploadPartRequest;
 use AsyncAws\S3\ValueObject\CompletedMultipartUpload;
@@ -667,6 +669,104 @@ class S3Service
         } catch (HttpException $e) {
             throw new SystemException(ErrorCode::STORAGE_UPLOAD_FAILED, previous: $e);
         }
+    }
+
+    // ── The read side of the session prefix (IP-149) ─────────────────────────────────────────
+    //
+    // Three operations, all scoped UNDER `datasets/monad-app-sessions/` and all read-only. They
+    // exist for the register: the backfill lists what is there, the multipart path reads back a
+    // sidecar it sealed in parts, and the admin hands an operator a short-lived link to one file.
+    // None of them accepts a key from a caller; every key is derived through the same sanitisers
+    // the write side uses, so this class cannot be talked into reading outside the prefix.
+
+    public const SESSIONS_PREFIX = 'datasets/monad-app-sessions/';
+
+    /**
+     * Every object under the session prefix, as `participant/session` => [filename => {bytes, last_modified}].
+     *
+     * Paginated through to the end: the prefix holds every session since the lab stack was written
+     * and one page is 1 000 keys. `$participant` narrows the listing to one pseudonym.
+     *
+     * @return array<string, array<string, array{bytes: int, last_modified: string|null}>>
+     */
+    public function listSessionObjects(?string $participant = null): array
+    {
+        $prefix = self::SESSIONS_PREFIX;
+        if ($participant !== null && $participant !== '') {
+            $prefix .= $this->sanitizeIdentifier($participant) . '/';
+        }
+
+        $out = [];
+        try {
+            $result = $this->s3Client->listObjectsV2(new ListObjectsV2Request([
+                'Bucket' => $this->bucket,
+                'Prefix' => $prefix,
+            ]));
+            // async-aws iterates continuation tokens for us when the result is walked.
+            foreach ($result->getContents() as $object) {
+                $key = (string) $object->getKey();
+                $rel = substr($key, strlen(self::SESSIONS_PREFIX));
+                $parts = explode('/', $rel);
+                if (count($parts) !== 3 || $parts[2] === '') {
+                    continue; // not participant/session/filename — a stray key, not a session artefact
+                }
+                [$p, $sid, $filename] = $parts;
+                $out["$p/$sid"][$filename] = [
+                    'bytes' => (int) $object->getSize(),
+                    'last_modified' => $object->getLastModified()?->format(\DateTimeInterface::ATOM),
+                ];
+            }
+        } catch (HttpException $e) {
+            throw new SystemException(ErrorCode::STORAGE_S3_UNAVAILABLE, previous: $e);
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * One session artefact's bytes, or null when the object is absent. Bounded by `$maxBytes`:
+     * a larger object returns null rather than being read, because the only artefacts this is for
+     * are sidecars and a sidecar over the cap is not a sidecar.
+     */
+    public function getSessionObject(string $participantId, string $sessionId, string $filename, int $maxBytes): ?string
+    {
+        $objectKey = $this->sessionObjectKey($participantId, $sessionId, $filename);
+        try {
+            $result = $this->s3Client->getObject(new GetObjectRequest([
+                'Bucket' => $this->bucket,
+                'Key' => $objectKey,
+            ]));
+            $length = $result->getContentLength();
+            if ($length !== null && $length > $maxBytes) {
+                return null;
+            }
+            $body = $result->getBody()->getContentAsString();
+
+            return strlen($body) > $maxBytes ? null : $body;
+        } catch (HttpException $e) {
+            if ($e->getResponse()->getStatusCode() === 404) {
+                return null;
+            }
+            throw new SystemException(ErrorCode::STORAGE_S3_UNAVAILABLE, previous: $e);
+        }
+    }
+
+    /**
+     * A short-lived GET link to one session artefact, for the admin's artefact table.
+     *
+     * Fifteen minutes by default (`HETZNER_S3_PRESIGNED_URL_EXPIRY`), the same window the upload
+     * links get. The link is only ever rendered on `/admin`, which is tailnet-only and
+     * superadmin-only; it is not an API response.
+     */
+    public function presignedSessionGetUrl(string $participantId, string $sessionId, string $filename): string
+    {
+        $request = new GetObjectRequest([
+            'Bucket' => $this->bucket,
+            'Key' => $this->sessionObjectKey($participantId, $sessionId, $filename),
+        ]);
+
+        return $this->s3Client->presign($request, new \DateTimeImmutable($this->presignedUrlExpiry));
     }
 
     /**

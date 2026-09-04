@@ -11,6 +11,19 @@ parameters:
     # compilation failed with "parameter not found" and every session upload returned 500,
     # whether or not the variable was set.
     env(HETZNER_S3_USE_PATH_STYLE): '1'
+    # IP-149 — the admin's clock. Every timestamp the management interface prints is the stored
+    # instant converted to this one zone, with the zone abbreviation beside it. Defaults to the
+    # lab's own zone rather than UTC because the operator reads it standing in the building.
+    env(MONAD_ADMIN_TIMEZONE): 'Europe/Bratislava'
+    # IP-149 — the walk figures. Both empty by default: an unconfigured deployment renders every
+    # admin table from Postgres alone and prints one sentence where the figures would be.
+    # Empty means "no metrics store": the arming check stays off and the fleet read reports
+    # `reachable: false`. Declared here so an UNSET variable is the empty string too — the
+    # `default::` processor below used to hand the readers null, a TypeError on every request
+    # on a host without the variable (the dev compose, this test suite, a laptop).
+    env(MONAD_METRICS_URL): ''
+    env(MONAD_WEB_INTERNAL_URL): ''
+    env(MONAD_WALK_FIGURE_KEY): ''
 
 services:
     # default configuration for services in *this* file
@@ -74,7 +87,7 @@ services:
 
     App\Quest\MimirCaptureState:
         arguments:
-            $metricsUrl: '%env(default::MONAD_METRICS_URL)%'
+            $metricsUrl: '%env(MONAD_METRICS_URL)%'
 
     # The fleet's public vital signs for the website (`GET /api/lab/fleet`).
     #
@@ -89,4 +102,18 @@ services:
     # the website needs no route into the observability stack.
     App\Fleet\FleetMetricsReader:
         arguments:
-            $metricsUrl: '%env(default::MONAD_METRICS_URL)%'
+            $metricsUrl: '%env(MONAD_METRICS_URL)%'
+
+    # IP-149 — signed URLs to the walk figures monad-knowledge web renders under `/internal/`.
+    # The key is `vault_walk_figure_signing_key` in the monad-knowledge inventory, rendered into
+    # this container's env AND into monad-web's config by the same play, so the two cannot drift.
+    # The URL is the tailnet name the operator's browser can reach, not a docker-bridge address:
+    # the browser fetches the image, not this container.
+    App\Service\WalkFigureUrlSigner:
+        arguments:
+            $baseUrl: '%env(MONAD_WEB_INTERNAL_URL)%'
+            $signingKey: '%env(MONAD_WALK_FIGURE_KEY)%'
+
+    App\Twig\AdminExtension:
+        arguments:
+            $timezone: '%env(MONAD_ADMIN_TIMEZONE)%'

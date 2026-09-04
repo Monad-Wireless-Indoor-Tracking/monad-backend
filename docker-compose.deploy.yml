@@ -55,6 +55,11 @@ services:
       # quest-arming check. Empty disables both, and the fleet endpoint then
       # reports `reachable: false` rather than an invented quiet fleet.
       MONAD_METRICS_URL: ${MONAD_METRICS_URL:-http://mimir:9009/prometheus}
+      # IP-149 — the admin's walk figures (monad-knowledge web `/internal/`, signed). Rendered
+      # into the env file by roles/monad_api; both default to empty, which turns the figures
+      # off and leaves every admin table unaffected.
+      MONAD_WEB_INTERNAL_URL: ${MONAD_WEB_INTERNAL_URL:-}
+      MONAD_WALK_FIGURE_KEY: ${MONAD_WALK_FIGURE_KEY:-}
     ports:
       # Loopback only; api.monad.dubec.dev is terminated by the host nginx.
       # NOT 8080 — Headscale's control server already listens there, and the

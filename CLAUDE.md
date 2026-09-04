@@ -28,14 +28,46 @@ API for the MonadCount mobile instrument. Symfony 7.3 (PHP 8.3) + PostgreSQL.
 | `GET /api/lab/time` | Coarse four-timestamp fallback. The real clock discipline runs over the collector's UDP socket, on the same path the data takes. |
 | `POST /api/lab/ground-truth` | Ground-truth check-in/out scans from participant devices, single or batched. Idempotent on `scan_nonce`. |
 | `GET /api/lab/ground-truth/{labSessionId}` | Live room-wide people tally for one session, per zone and overall. Cheap to poll. |
-| `/api/auth/*`, `/api/quest*` | Accounts and the quest schedule engine. |
+| `/api/auth/*`, `/api/quest*` | Accounts and the quest schedule engine. `POST /api/quest/{id}/start` takes an optional `{"handset": {…}}` body (IP-149): the phone's description of itself, validated against a **closed key set** (`App\Quest\HandsetDescriptor`, 400 `VALIDATION_108`/`_109` on anything present and wrong) and frozen VERBATIM on the enrollment (`handset_snapshot`) beside the `handsets` row it finds-or-creates by the app's own installation UUID. An empty body is an app build that predates the descriptor and stays valid. |
 | `GET /api/lab/fleet` | The fleet's public vital signs for `monad.dubec.dev` — per-node readings and fleet-wide scalars, from a closed PromQL allow-list (`App\Fleet\FleetMetricsReader`). Exists so the website, a host process, never needs a route into the observability stack: Mimir publishes no host port, this container is on the same `monad` network and reaches `mimir:9009` by container DNS. Unauthenticated (the site holds no JWT) and **404'd on the public vhost** like `/admin` — the site calls it over loopback. `reachable: false` is a first-class answer and must not be rendered as zeros. |
 
 `MONAD_METRICS_URL` (`http://mimir:9009/prometheus`) is read by two things, because it is one
 dependency: the fleet endpoint above, and the IP-128 quest-arming check ("is this node
 capturing?"). The arming check **fails open** and was inert while the variable was unset — setting
 it turns it on, so a measurement quest at a resting node stops being offered. That is the designed
-behaviour and it is a change to the participant path; set it to `""` to keep it off.
+behaviour and it is a change to the participant path; set it to `""` to keep it off. An UNSET
+variable is the empty string too (`services.yaml` declares the default): until 2026-09-04 the
+`default::` processor handed the readers `null`, and the container crashed at `cache:clear` on
+any host without the variable — the dev compose, a laptop, the test suite.
+
+## Two kinds of provenance on an enrollment (IP-128, IP-149)
+
+`quest_enrollments.device_id` says which fleet node listened; `quest_enrollments.handset_id` says
+which phone walked. A **`Device`** is a fleet node — the box a sticker is stuck to. A **`Handset`** is
+one app installation on one phone, keyed by a UUID the app mints once and keeps; a reinstall is a
+new row by decision, and no platform device identifier (`identifierForVendor`, `ANDROID_ID`) is
+accepted or stored. `handsets.last_descriptor` is a read model for the inventory page; the evidence
+for a given run is the per-run `handset_snapshot`, never normalised. Both columns are written once
+at start and rendered read-only, for the reason ground-truth scans are.
+
+## The recording-session register (IP-149)
+
+`lab_sessions` is one row per session the app uploaded — the register behind
+`datasets/monad-app-sessions/`. **Written by the upload path, never by a form**: `S3Controller`
+upserts a row on every accepted artefact (`INSERT … ON CONFLICT DO UPDATE SET artefacts =
+artefacts || excluded.artefacts`, because ten handsets flush concurrently) and completes it when
+`metadata.json` arrives, resolving the sidecar's `identity.enrollment_id`, `identity.quest_id` and
+`environment.handset.handset_id` to rows **only when they exist**. `completed_at` is set once; a
+replayed sidecar does not move it. The whole sidecar is kept as `jsonb`. **NOT the ground-truth
+session**: `ground_truth_scans.lab_session_id` is the event the phones stamp on scans, and a scan
+joins a recording session only through `recording_session_id`. Sessions uploaded before 2026-09-04
+enter the register through `app:lab-sessions:backfill` (idempotent, one-shot, doubles as the
+reconciler):
+
+```bash
+docker exec -it monad_api php bin/console app:lab-sessions:backfill --dry-run   # list, write nothing
+docker exec -it monad_api php bin/console app:lab-sessions:backfill             # every session on S3
+```
 
 ## Management interface (`/admin`)
 
@@ -60,6 +92,33 @@ What is editable is a deliberate line, not an oversight:
 | Lab bundle | **read-only** — Ansible renders it and bind-mounts it read-only, so an edit here would be reverted by the next run while appearing to have worked. |
 | Users | edit + anonymise. No hard delete: `softDelete()` scrubs identity in place and leaves the pseudonymous scans countable. Passwords are write-only and blank means "keep". |
 | Quests, steps, enrollments, News, QR codes | full CRUD. Step `config` is edited as raw JSON (`App\Form\JsonType`) and invalid JSON fails the form — a malformed config surfaces on a participant's phone as a step that does nothing. |
+| Recording sessions | **none** — written by the upload path. The list is a CRUD index (filters, search); the detail is a reading page. |
+| Handsets | `label` only — an operator note next to a machine string. Everything else is what the phone reported. No NEW, no DELETE (`ON DELETE RESTRICT` from enrollments). |
+
+**The reading pages (IP-149).** Beyond the CRUD, `DashboardController` renders the pages an
+operator reads a run on, all tables, none writing: the **Overview** (activity for 24 h / 7 d / all,
+recent recording sessions and enrollments, the fleet strip), **Recording session** (`/admin/runs/
+sessions/{id}`: sidecar block by block, artefacts with 15-minute presigned links, the walk figures,
+the ground truth naming it), **Enrollment** (`/admin/runs/enrollments/{id}`: handset snapshot, steps
+in realised order with `mono_ns` and skips, its recording sessions and their figures), **Handset**
+(`/admin/runs/handsets/{id}`), **Participant** (`/admin/people/{id}`), **Arming matrix** (quests ×
+nodes, unfiltered, through `App\Quest\ArmingMatrixBuilder` — the same builder the public JSON
+reads), **Fleet vitals** (`FleetMetricsReader`, `reachable: false` as a sentence) and **Quest
+analytics** (funnel, duration quantiles, skip reasons, failing steps, per node; inline SVG bars, no
+chart library). Every clock is the stored instant converted to `MONAD_ADMIN_TIMEZONE` (default
+`Europe/Bratislava`) through the `clock` Twig filter, zone abbreviation beside it; never `strftime`
+on the UTC host. Look: `public/admin.css` — tables over cards, sharp corners.
+
+**The walk figures come from monad-knowledge web, not from here.** The reduction that draws a walk
+lives in `monad_knowledge.walk`; re-implementing it in PHP would be a second reduction. The admin
+embeds `<img>` tags pointing at `/internal/walk/{participant}/{session}/{view}.png` on
+`monad-web.monad.internal:8083`, signed by `App\Service\WalkFigureUrlSigner`
+(`HMAC-SHA256(key, "{participant}/{session}/{view}|{floor}|{exp}")`, one-hour expiry). The operator's
+BROWSER fetches them over the tailnet; this container never does. Two env vars, both rendered by
+`roles/monad_api`: `MONAD_WEB_INTERNAL_URL` (the tailnet name) and `MONAD_WALK_FIGURE_KEY`
+(`vault_walk_figure_signing_key`, the same variable monad-web's `.env` gets). Both empty = figures
+off and every table unaffected; the page prints one sentence. The `site` figure (mesh registered to
+the floor) also needs `floor` in the lab bundle.
 
 ## Ground truth (the people channel)
 

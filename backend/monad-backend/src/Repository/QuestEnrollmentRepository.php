@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Device;
+use App\Entity\Handset;
 use App\Entity\Quest;
 use App\Entity\QuestEnrollment;
 use App\Entity\User;
@@ -340,6 +341,175 @@ class QuestEnrollmentRepository extends ServiceEntityRepository
             ],
             'history' => $history,
             'activity' => $activity,
+        ];
+    }
+
+    // ── The admin's read models (IP-149 Part C) ──────────────────────────────────────────────
+
+    /**
+     * Enrollments started, and how they ended, since an instant. `null` means all time.
+     *
+     * "Ended" is read from `status`, not from `completed_at`: an abandoned run has no
+     * completion and the funnel must still count it.
+     *
+     * @return array{started: int, completed: int, abandoned: int, failed: int, in_progress: int}
+     */
+    public function activitySince(?\DateTimeImmutable $since): array
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->select('e.status AS status, COUNT(e.id) AS n')
+            ->groupBy('e.status');
+        if ($since !== null) {
+            $qb->andWhere('e.createdAt >= :since')->setParameter('since', $since);
+        }
+        $out = ['started' => 0, 'completed' => 0, 'abandoned' => 0, 'failed' => 0, 'in_progress' => 0];
+        foreach ($qb->getQuery()->getArrayResult() as $row) {
+            $status = $row['status'] instanceof QuestEnrollmentStatus ? $row['status']->value : (string) $row['status'];
+            $n = (int) $row['n'];
+            $out['started'] += $n;
+            if (array_key_exists($status, $out)) {
+                $out[$status] += $n;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Newest enrollments with their relations loaded, for the overview and the participant page.
+     *
+     * @return list<QuestEnrollment>
+     */
+    public function findRecent(int $limit = 10, ?User $user = null, ?Handset $handset = null): array
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->leftJoin('e.quest', 'q')->addSelect('q')
+            ->leftJoin('e.user', 'u')->addSelect('u')
+            ->leftJoin('e.device', 'd')->addSelect('d')
+            ->leftJoin('e.handset', 'h')->addSelect('h')
+            ->orderBy('e.createdAt', 'DESC')
+            ->setMaxResults($limit);
+        if ($user !== null) {
+            $qb->andWhere('e.user = :user')->setParameter('user', $user);
+        }
+        if ($handset !== null) {
+            $qb->andWhere('e.handset = :handset')->setParameter('handset', $handset);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Everything the quest-analytics page prints for one quest.
+     *
+     * Durations are wall-clock from the enrollment's creation to its `completed_at`, for
+     * COMPLETED runs only, and only when the span is positive and under a day — the same
+     * clock-artefact rule `statsForUser()` applies to dwells. Quantiles are nearest-rank on the
+     * sorted list; with fewer than three samples the page prints the samples, not quantiles.
+     *
+     * @return array{
+     *   funnel: array{started: int, completed: int, abandoned: int, failed: int, in_progress: int},
+     *   durations: list<int>,
+     *   quantiles: array{p10: int, p50: int, p90: int}|null,
+     *   skip_reasons: list<array{error_code: string, n: int}>,
+     *   step_skips: list<array{step: string, type: string, skipped: int, failed: int, completed: int}>,
+     *   per_device: list<array{slug: string, completed: int, started: int}>
+     * }
+     */
+    public function analyticsForQuest(Quest $quest): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $questId = $quest->getId()?->toRfc4122();
+
+        $funnel = ['started' => 0, 'completed' => 0, 'abandoned' => 0, 'failed' => 0, 'in_progress' => 0];
+        foreach ($conn->fetchAllAssociative(
+            'SELECT status, COUNT(*) AS n FROM quest_enrollments WHERE quest_id = :q GROUP BY status',
+            ['q' => $questId],
+        ) as $row) {
+            $funnel['started'] += (int) $row['n'];
+            if (array_key_exists((string) $row['status'], $funnel)) {
+                $funnel[(string) $row['status']] += (int) $row['n'];
+            }
+        }
+
+        $durations = array_map('intval', $conn->fetchFirstColumn(
+            <<<'SQL'
+                SELECT EXTRACT(EPOCH FROM (completed_at - created_at))::int AS seconds
+                  FROM quest_enrollments
+                 WHERE quest_id = :q AND status = 'completed' AND completed_at IS NOT NULL
+                   AND completed_at > created_at
+                   AND completed_at - created_at < INTERVAL '1 day'
+                 ORDER BY seconds
+                SQL,
+            ['q' => $questId],
+        ));
+        $quantiles = null;
+        if (count($durations) >= 3) {
+            $rank = static fn (float $p) => $durations[max(0, (int) ceil($p * count($durations)) - 1)];
+            $quantiles = ['p10' => $rank(0.10), 'p50' => $rank(0.50), 'p90' => $rank(0.90)];
+        }
+
+        $skipReasons = array_map(static fn (array $r): array => [
+            'error_code' => (string) ($r['error_code'] ?? '') ?: '(none)',
+            'n' => (int) $r['n'],
+        ], $conn->fetchAllAssociative(
+            <<<'SQL'
+                SELECT COALESCE(r.error_code, '') AS error_code, COUNT(*) AS n
+                  FROM quest_step_skip_records r
+                  JOIN quest_step_completions c ON c.id = r.step_completion_id
+                  JOIN quest_enrollments e ON e.id = c.enrollment_id
+                 WHERE e.quest_id = :q
+                 GROUP BY r.error_code
+                 ORDER BY n DESC
+                SQL,
+            ['q' => $questId],
+        ));
+
+        $stepSkips = array_map(static fn (array $r): array => [
+            'step' => (string) $r['step'],
+            'type' => (string) $r['type'],
+            'skipped' => (int) $r['skipped'],
+            'failed' => (int) $r['failed'],
+            'completed' => (int) $r['completed'],
+        ], $conn->fetchAllAssociative(
+            <<<'SQL'
+                SELECT s.name AS step, s.type AS type,
+                       COUNT(*) FILTER (WHERE c.status = 'skipped')   AS skipped,
+                       COUNT(*) FILTER (WHERE c.status = 'failed')    AS failed,
+                       COUNT(*) FILTER (WHERE c.status = 'completed') AS completed
+                  FROM quest_step_completions c
+                  JOIN quest_steps s ON s.id = c.step_id
+                  JOIN quest_enrollments e ON e.id = c.enrollment_id
+                 WHERE e.quest_id = :q
+                 GROUP BY s.id, s.name, s.type, s."order"
+                 ORDER BY s."order"
+                SQL,
+            ['q' => $questId],
+        ));
+
+        $perDevice = array_map(static fn (array $r): array => [
+            'slug' => (string) ($r['slug'] ?? '') ?: '(no node)',
+            'completed' => (int) $r['completed'],
+            'started' => (int) $r['started'],
+        ], $conn->fetchAllAssociative(
+            <<<'SQL'
+                SELECT d.slug, COUNT(*) AS started, COUNT(*) FILTER (WHERE e.status = 'completed') AS completed
+                  FROM quest_enrollments e
+                  LEFT JOIN devices d ON d.id = e.device_id
+                 WHERE e.quest_id = :q
+                 GROUP BY d.slug
+                 ORDER BY started DESC
+                SQL,
+            ['q' => $questId],
+        ));
+
+        return [
+            'funnel' => $funnel,
+            'durations' => $durations,
+            'quantiles' => $quantiles,
+            'skip_reasons' => $skipReasons,
+            'step_skips' => $stepSkips,
+            'per_device' => $perDevice,
         ];
     }
 

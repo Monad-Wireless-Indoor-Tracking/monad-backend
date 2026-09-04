@@ -35,6 +35,9 @@ class ErrorCode
     public const VALIDATION_PASSWORD_TOO_SHORT = 'VALIDATION_105';
     public const VALIDATION_PASSWORD_TOO_LONG = 'VALIDATION_106';
     public const VALIDATION_NAME_TOO_LONG = 'VALIDATION_107';
+    /** IP-149 — the handset descriptor in a quest-start body. */
+    public const VALIDATION_HANDSET_MALFORMED = 'VALIDATION_108';
+    public const VALIDATION_HANDSET_TOO_LARGE = 'VALIDATION_109';
     public const VALIDATION_FAILED = 'VALIDATION_199';
 
     // Resource Errors (200-299)
@@ -88,6 +91,8 @@ class ErrorCode
             self::VALIDATION_PASSWORD_TOO_SHORT => 'Password is too short (min 8 characters)',
             self::VALIDATION_PASSWORD_TOO_LONG => 'Password is too long (max 255 characters)',
             self::VALIDATION_NAME_TOO_LONG => 'Name is too long (max 255 characters)',
+            self::VALIDATION_HANDSET_MALFORMED => 'Handset descriptor is malformed: it must be an object with handset_id and platform (ios|android), and only the keys the API knows',
+            self::VALIDATION_HANDSET_TOO_LARGE => 'Handset descriptor exceeds 64 kB',
             self::VALIDATION_FAILED => 'Validation failed',
 
             self::RESOURCE_NOT_FOUND => 'Requested resource not found',

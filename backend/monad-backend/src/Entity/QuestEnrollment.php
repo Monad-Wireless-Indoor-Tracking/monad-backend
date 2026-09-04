@@ -16,6 +16,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(name: 'enrollment_status_idx', columns: ['status'])]
 #[ORM\Index(name: 'user_quest_idx', columns: ['user_id', 'quest_id'])]
 #[ORM\Index(name: 'enrollment_user_awarded_idx', columns: ['user_id', 'awarded_at'])]
+#[ORM\Index(name: 'enrollment_handset_idx', columns: ['handset_id'])]
 #[ORM\HasLifecycleCallbacks]
 class QuestEnrollment
 {
@@ -107,6 +108,33 @@ class QuestEnrollment
      */
     #[ORM\Column(name: 'awarded_at', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $awardedAt = null;
+
+    /**
+     * Which app installation walked this run (IP-149).
+     *
+     * The other half of the provenance `$device` records: the device is the radio
+     * that listened, the handset is the transmitter that walked. Same posture —
+     * written once at start, never updated, rendered read-only, RESTRICT on delete.
+     * NULL means the app build sent no descriptor (pre-IP-149), which stays valid.
+     */
+    #[ORM\ManyToOne(targetEntity: Handset::class)]
+    #[ORM\JoinColumn(name: 'handset_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?Handset $handset = null;
+
+    /**
+     * The handset descriptor AS SENT at start, verbatim (IP-149).
+     *
+     * OS version, app build, capability tokens, sensor inventory and thermal state
+     * all drift between runs, so the row on `handsets` cannot say what this phone
+     * was at this moment; this column can. Not normalised, for the reason
+     * `$realisedSteps` stores a sequence rather than a seed: the analysis asks
+     * "what did this phone report then", and a normalisation step is a place
+     * where two builds could be made to look alike.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(name: 'handset_snapshot', type: Types::JSON, nullable: true, options: ['jsonb' => true])]
+    private ?array $handsetSnapshot = null;
 
     #[ORM\OneToMany(targetEntity: QuestStepCompletion::class, mappedBy: 'enrollment', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $stepCompletions;
@@ -241,6 +269,36 @@ class QuestEnrollment
     public function getCompletionReceivedAt(): ?\DateTimeImmutable
     {
         return $this->completionReceivedAt;
+    }
+
+    public function getHandset(): ?Handset
+    {
+        return $this->handset;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getHandsetSnapshot(): ?array
+    {
+        return $this->handsetSnapshot;
+    }
+
+    /**
+     * Freeze which installation walked this run and what it reported. One-way.
+     *
+     * A second call is ignored rather than overwriting, for the reason
+     * `awardPoints()` is: provenance written at start must not be movable later.
+     *
+     * @param array<string, mixed> $snapshot the validated descriptor, as sent
+     */
+    public function attachHandset(Handset $handset, array $snapshot): static
+    {
+        if ($this->handset !== null) {
+            return $this;
+        }
+        $this->handset = $handset;
+        $this->handsetSnapshot = $snapshot;
+
+        return $this;
     }
 
     /** Stamped by the server on receipt; never taken from a request body. */

@@ -38,7 +38,15 @@ class QuestEnrollmentCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
+        // IP-149 — the reading of a run (steps, handset, sessions, ground truth, figures) is a
+        // custom page; the CRUD detail stays for the raw field list and the edit stays for the one
+        // legitimate write, marking a dead run abandoned.
+        $open = Action::new('open', 'Open', 'fa fa-folder-open')
+            ->linkToRoute('admin_enrollment', static fn (QuestEnrollment $e) => ['id' => $e->getId()->toRfc4122()]);
+
         return $actions
+            ->add(Crud::PAGE_INDEX, $open)
+            ->add(Crud::PAGE_DETAIL, $open)
             ->add(Crud::PAGE_INDEX, Action::DETAIL)
             ->disable(Action::NEW);
     }
@@ -59,6 +67,10 @@ class QuestEnrollmentCrudController extends AbstractCrudController
         yield AssociationField::new('device', 'Device')
             ->formatValue(static fn ($value, $entity) => $entity->getDevice()?->getSlug() ?? '—')
             ->onlyOnDetail();
+        // IP-149 — which installation walked this run. Provenance like `device`, read-only like it.
+        yield AssociationField::new('handset', 'Handset')
+            ->formatValue(static fn ($value, $entity) => $entity->getHandset()?->displayName() ?? 'not reported')
+            ->hideOnForm();
         // Server-stamped, and the only column the cooldown gate trusts —
         // `completedAt` arrives in the request body.
         yield DateTimeField::new('completionReceivedAt', 'Completion received')

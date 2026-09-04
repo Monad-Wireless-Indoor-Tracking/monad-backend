@@ -41,7 +41,14 @@ class QuestCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
-        return $actions->add(Crud::PAGE_INDEX, Action::DETAIL);
+        // IP-149 — funnel, durations, skip reasons and failing steps for this quest.
+        $analytics = Action::new('analytics', 'Analytics', 'fa fa-chart-simple')
+            ->linkToRoute('admin_quest_analytics', static fn (Quest $q) => ['id' => $q->getId()?->toRfc4122()]);
+
+        return $actions
+            ->add(Crud::PAGE_INDEX, Action::DETAIL)
+            ->add(Crud::PAGE_INDEX, $analytics)
+            ->add(Crud::PAGE_DETAIL, $analytics);
     }
 
     public function configureFields(string $pageName): iterable

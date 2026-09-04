@@ -3,10 +3,7 @@
 namespace App\Controller;
 
 use App\Dto\Lab\ArmingMatrixResponseDto;
-use App\Entity\Quest;
-use App\Quest\QuestArmingService;
-use App\Repository\DeviceRepository;
-use App\Repository\QuestRepository;
+use App\Quest\ArmingMatrixBuilder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
@@ -18,15 +15,8 @@ use Symfony\Component\Routing\Annotation\Route;
  * arming, `GET /api/quest/{id}` carries no device dimension at all, and `GET /api/device/{slug}`
  * carries the availability but drops three of its reasons on the floor.
  *
- * THE ASSESSMENT HERE IS UNFILTERED, AND THAT IS THE WHOLE POINT.
- *
- * `QuestAvailabilityFilter::isHidden()` removes `window_closed`, `not_armed` and
- * `device_inactive` from a participant's list, which is right: a quest outside its window or not
- * offered at this box is noise to a stranger standing in front of it. Inheriting that filter here
- * would make the matrix useless in the specific way that matters — an empty cell would mean
- * "outside its window" or "not armed here" or "node out of service" or "we filtered it", and the
- * researcher checking arming from a corridor before a session would read the first as the second
- * and stand down a quest that was fine.
+ * The matrix itself is built by {@see ArmingMatrixBuilder}, which the admin's arming page reads
+ * too (IP-149): one computation, two readers, no way for the site and the operator to disagree.
  *
  * UNAUTHENTICATED, like the two public reads either side of it. What that publishes is
  * experimental design — accepted by owner decision 4 — and two properties bound what it buys an
@@ -39,64 +29,20 @@ use Symfony\Component\Routing\Annotation\Route;
 class ArmingMatrixController extends AbstractController
 {
     public function __construct(
-        private readonly QuestRepository $quests,
-        private readonly DeviceRepository $devices,
-        private readonly QuestArmingService $arming,
+        private readonly ArmingMatrixBuilder $matrix,
     ) {
     }
 
     #[Route('/api/lab/arming-matrix', name: 'api_lab_arming_matrix', methods: ['GET'])]
     public function matrix(): JsonResponse
     {
-        // Every device, not just the active ones: `device_inactive` is a cell state the ops view
-        // must be able to show, and a node dropped from the list would show it as a missing
-        // column instead — the same ambiguity the filter above was rejected for.
-        $devices = $this->devices->findBy([], ['slug' => 'ASC']);
-
-        $rows = [];
-        foreach ($this->quests->findAll() as $quest) {
-            if (!$quest instanceof Quest) {
-                continue;
-            }
-
-            $requiresCapture = QuestArmingService::producesMeasurement($quest);
-
-            $cells = [];
-            foreach ($devices as $device) {
-                $availability = $this->arming->assess(
-                    quest: $quest,
-                    // No user, like the device page: this describes the world — window, arming,
-                    // node state — never a participant's history. `assess()` returns
-                    // `available()` for a guest before any cooldown is evaluated, so `retry_at`
-                    // is always null here and the column is a shape, not a value.
-                    user: null,
-                    device: $device,
-                    requiresCapture: $requiresCapture,
-                );
-
-                $cells[] = [
-                    'slug' => $device->getSlug(),
-                    // Not derived from the reason: a quest armed at a node can still be blocked
-                    // by its window, and an ops view has to be able to see arming and blocking
-                    // as the two independent facts they are.
-                    'armed' => $quest->isArmedAt($device),
-                    'availability' => $availability->jsonSerialize(),
-                ];
-            }
-
-            $rows[] = [
-                'id' => (string) $quest->getId(),
-                'name' => $quest->getName(),
-                'description' => $quest->getDescription(),
-                'points' => $quest->getPoints(),
-                'estimated_duration' => $quest->getEstimatedDuration(),
-                'available_from' => $quest->getAvailableFrom()?->format(\DateTimeInterface::ATOM),
-                'available_to' => $quest->getAvailableTo()?->format(\DateTimeInterface::ATOM),
-                'recurrence' => $quest->getRecurrencePolicy()?->jsonSerialize(),
-                'required_capabilities' => $quest->getRequiredCapabilities(),
-                'devices' => $cells,
-            ];
+        $rows = $this->matrix->build()['rows'];
+        // The public projection carries what it carried before IP-149; the two admin-only
+        // keys the builder adds for the operator's table stay out of the JSON.
+        foreach ($rows as &$row) {
+            unset($row['audience'], $row['produces_measurement']);
         }
+        unset($row);
 
         $response = $this->json((new ArmingMatrixResponseDto($rows))->toArray());
         // The same short, uniform cache the other two public reads carry: the portal page in

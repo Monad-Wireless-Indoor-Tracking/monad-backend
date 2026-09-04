@@ -1,6 +1,7 @@
 {
   "version": 3,
   "site": "fiit-ground-0",
+  "floor": "fiit-ground-0",
 
   "collector": {
     "host": "",

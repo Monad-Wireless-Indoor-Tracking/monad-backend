@@ -1,6 +1,7 @@
 {% extends '@EasyAdmin/page/content.html.twig' %}
+{% import 'admin/_macros.html.twig' as m %}
 
-{% block content_title %}Session {{ lab_session_id }}{% endblock %}
+{% block content_title %}Ground-truth session {{ lab_session_id }}{% endblock %}
 
 {% block main %}
     {% set overall = aggregate.overall %}
@@ -110,6 +111,14 @@
             </div>
         </div>
     {% endif %}
+
+    <div class="card mb-3">
+        <div class="card-header">Recording sessions the scans name</div>
+        <div class="table-responsive">{{ m.session_rows(recording_sessions) }}</div>
+        <div class="card-body pt-2 pb-2">
+            <p class="text-muted small mb-0">Through <code>recording_session_id</code> on the scans. A scan stamped by a phone that never uploaded, or whose upload predates the register, names nothing here.</p>
+        </div>
+    </div>
 
     <div class="card">
         <div class="card-header">Latest scans</div>

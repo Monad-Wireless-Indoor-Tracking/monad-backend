@@ -63,6 +63,10 @@ class LabConfigService
         return [
             'version' => 0,
             'site' => '',
+            // IP-149 — the committed floor bundle the admin registers walks against
+            // (`monad_knowledge/web/static/floors/<floor>.json`). Empty means the admin
+            // omits the `site` figure and says why; it never guesses a floor from `site`.
+            'floor' => '',
             'collector' => ['host' => '', 'udp_port' => 9999, 'http_base' => ''],
             'access_points' => [],
             'beacons' => ['uuid' => '', 'majors' => [], 'zones' => []],
