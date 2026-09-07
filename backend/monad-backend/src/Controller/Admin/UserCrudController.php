@@ -84,14 +84,17 @@ class UserCrudController extends AbstractCrudController
         yield EmailField::new('email');
         yield TextField::new('name')->setRequired(false);
 
-        yield ChoiceField::new('roles')
+        // Bound to assignedRoles, NOT to roles. getRoles() is the security contract and appends the
+        // implicit ROLE_USER on every read, so a field bound to it showed a tick nobody had set and
+        // could not persist the absence of one. assignedRoles is the stored array and round-trips.
+        yield ChoiceField::new('assignedRoles', 'Roles')
             ->setChoices(array_combine(
                 array_map(static fn (UserRole $r) => $r->name, UserRole::cases()),
                 array_map(static fn (UserRole $r) => $r->value, UserRole::cases()),
             ))
             ->allowMultipleChoices()
             ->renderExpanded()
-            ->setHelp('ROLE_SUPERADMIN grants full access to this management interface.');
+            ->setHelp('ROLE_USER is implicit and does not need to be ticked. ROLE_SUPERADMIN grants full access to this management interface.');
 
         yield ChoiceField::new('status')
             ->setChoices(array_combine(
@@ -170,9 +173,12 @@ class UserCrudController extends AbstractCrudController
     /**
      * Move the unmapped plaintext onto the entity, hashed.
      *
-     * POST_SUBMIT runs before the validator's own listener, so by the time #[Assert\NotBlank]
-     * looks at the property it holds a hash — on a new account the one just made here, on an edit
-     * the one already in the database.
+     * The PRIORITY is load-bearing. Symfony's own ValidationListener is registered on POST_SUBMIT
+     * at priority 0 while the form factory builds the form, which is before this method ever sees
+     * the builder — so at equal priority it runs FIRST, validates a still-null password and fails
+     * #[Assert\NotBlank] on a new account no matter what was typed. That was the admin's 422 on
+     * user create. Above 0, this listener runs first and #[Assert\NotBlank] sees a hash — on a new
+     * account the one just made here, on an edit the one already in the database.
      */
     private function hashPasswordOnSubmit(FormBuilderInterface $formBuilder): FormBuilderInterface
     {
@@ -191,6 +197,6 @@ class UserCrudController extends AbstractCrudController
             if ($user instanceof User) {
                 $user->setPassword($this->passwordHasher->hashPassword($user, $plaintext));
             }
-        });
+        }, 100);
     }
 }

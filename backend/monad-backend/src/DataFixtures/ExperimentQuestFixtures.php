@@ -674,7 +674,7 @@ class ExperimentQuestFixtures extends Fixture implements DependentFixtureInterfa
         $admin->setEmail('admin@fiit.stuba.sk');
         $admin->setName('FIIT Admin');
         $admin->setPassword($this->passwordHasher->hashPassword($admin, 'admin123'));
-        $admin->addRole(UserRole::SUPERADMIN);
+        $admin->grantRole(UserRole::SUPERADMIN);
         $manager->persist($admin);
         $manager->flush();
 

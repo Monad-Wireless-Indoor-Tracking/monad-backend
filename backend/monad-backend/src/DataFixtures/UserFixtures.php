@@ -34,7 +34,7 @@ class UserFixtures extends Fixture
         $superadmin->setPassword(
             $this->passwordHasher->hashPassword($superadmin, 'admin123')
         );
-        $superadmin->addRole(UserRole::SUPERADMIN);
+        $superadmin->grantRole(UserRole::SUPERADMIN);
 
         $manager->persist($superadmin);
         $manager->flush();
