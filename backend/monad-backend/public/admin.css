@@ -1,0 +1,140 @@
+/*
+ * The management interface, flat (IP-149 Part C).
+ *
+ * Tables over cards, sharp corners, borders over shadows. EasyAdmin's theme is
+ * kept for layout and forms; this file removes its rounding and card chrome and
+ * adds the few classes the custom pages use. Loaded through
+ * DashboardController::configureAssets(), after the theme, so every rule below
+ * wins by order rather than by !important.
+ */
+
+:root {
+  --bs-border-radius: 0;
+  --bs-border-radius-sm: 0;
+  --bs-border-radius-lg: 0;
+  --bs-border-radius-xl: 0;
+  --bs-border-radius-pill: 0;
+  --border-radius: 0;
+  --border-radius-sm: 0;
+  --border-radius-lg: 0;
+}
+
+.card, .btn, .badge, .form-control, .form-select, .alert, .dropdown-menu, .modal-content,
+.page-item .page-link, .nav-tabs .nav-link, .input-group-text, pre, code, img.walk-figure {
+  border-radius: 0 !important;
+}
+
+.card {
+  box-shadow: none;
+  border: 1px solid var(--border-color, #d9dde3);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--border-color, #d9dde3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.78rem;
+}
+
+/* Dense, columnar. Numbers right-aligned, identifiers monospaced. */
+.table-dense {
+  font-size: 0.86rem;
+}
+.table-dense th, .table-dense td {
+  padding: 0.3rem 0.55rem;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.table-dense td.wrap, .table-dense th.wrap {
+  white-space: normal;
+}
+.table-dense th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--text-muted, #6b7280);
+  border-bottom: 1px solid var(--border-color, #d9dde3);
+}
+.table-dense td.num, .table-dense th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.table-dense code, .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82em;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* Two-column fact table: a label and a value per row. */
+.table-facts th {
+  width: 14rem;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  text-transform: none;
+  font-size: 0.82rem;
+}
+
+/* One-line status strip under the page title. */
+.strip {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-color, #d9dde3);
+  border-bottom: 1px solid var(--border-color, #d9dde3);
+  margin-bottom: 1rem;
+  font-size: 0.86rem;
+}
+.strip .k {
+  color: var(--text-muted, #6b7280);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  margin-right: 0.35rem;
+}
+
+/* State words, not coloured pills. */
+.state {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+.state-ok { color: #1a7f37; }
+.state-warn { color: #9a6700; }
+.state-bad { color: #b42318; }
+.state-muted { color: var(--text-muted, #6b7280); }
+
+/* Inline SVG bars (quest analytics). */
+.bars { width: 100%; height: auto; display: block; }
+.bars rect { fill: #0b57d0; }
+.bars rect.muted { fill: #b7c1cf; }
+.bars text { font-size: 9px; fill: #4b5563; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bars line { stroke: #d9dde3; stroke-width: 1; }
+
+/* Figures from monad-knowledge web. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+.figure { border: 1px solid var(--border-color, #d9dde3); padding: 0.5rem; background: #fff; }
+.figure img.walk-figure { width: 100%; height: auto; display: block; }
+.figure .caption { font-size: 0.78rem; color: var(--text-muted, #6b7280); margin-top: 0.35rem; }
+.figure .missing { font-size: 0.82rem; color: #9a6700; padding: 2rem 0.5rem; text-align: center; }
+
+/* Sidecar and JSON blocks: bounded height, scroll inside. */
+pre.json {
+  max-height: 24rem;
+  overflow: auto;
+  font-size: 0.78rem;
+  border: 1px solid var(--border-color, #d9dde3);
+  padding: 0.5rem;
+  margin: 0;
+  background: #fafbfc;
+}
+
+/* Arming matrix cells. */
+.matrix td.cell { text-align: center; }
+.matrix td.cell .why { display: block; font-size: 0.68rem; color: var(--text-muted, #6b7280); text-transform: none; }

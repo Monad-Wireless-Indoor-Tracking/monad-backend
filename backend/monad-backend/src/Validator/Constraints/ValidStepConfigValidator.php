@@ -55,7 +55,141 @@ class ValidStepConfigValidator extends ConstraintValidator
             QuestStepType::START, QuestStepType::FINISH => $this->validateStartFinishConfig($config, $constraint),
             QuestStepType::CONNECT_TO_AP => $this->validateConnectToApConfig($config, $constraint),
             QuestStepType::WALK_TO => $this->validateWalkToConfig($config, $constraint),
+            QuestStepType::SENSOR_CAPTURE => $this->validateSensorCaptureConfig($config, $constraint),
+            QuestStepType::BLE_ADVERTISE => $this->validateBleAdvertiseConfig($config, $constraint),
+            QuestStepType::PROBE => $this->validateProbeConfig($config, $constraint),
+            QuestStepType::OBSERVE => $this->validateObserveConfig($config, $constraint),
         };
+    }
+
+    /**
+     * IP-140 — the human headcount step.
+     *
+     * `min_readings` is required and has no default on purpose. A count step that
+     * silently accepts one reading and completes is the difference between a
+     * measurement and an anecdote, and the number of readings is a design decision
+     * the quest author has to make out loud.
+     */
+    private function validateObserveConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::OBSERVE->value;
+
+        $this->requireString($config, 'prompt', $type, $constraint);
+        $this->requirePositiveInteger($config, 'min_readings', $type, $constraint);
+
+        // An upper bound on the counter, so a fat finger cannot enter 400 people
+        // into a room with 83 seats. Optional: a room whose capacity nobody has
+        // stated should not get a fabricated one here.
+        if (isset($config['max_count'])) {
+            $this->validatePositiveInteger($config, 'max_count', $type, $constraint);
+        }
+    }
+
+    /**
+     * IP-140 — a probe names the surveyed points it will accept, and how long to stand there.
+     *
+     * `targets` is validated structurally rather than against a table: the authority for which
+     * codes exist is `infra/labels/*.toml` on the monad-knowledge side, and this service has no
+     * access to it. `lab quest-check` is what fails when a quest names a card that was never
+     * printed or never placed.
+     */
+    private function validateProbeConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::PROBE->value;
+
+        $this->requirePositiveInteger($config, 'dwell_seconds', $type, $constraint);
+
+        if (!isset($config['targets'])) {
+            $this->context->buildViolation($constraint->messageMissingField)
+                ->setParameter('{{ field }}', 'targets')
+                ->setParameter('{{ type }}', $type)
+                ->addViolation();
+
+            return;
+        }
+
+        if (!is_array($config['targets']) || $config['targets'] === []) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'targets')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'must be a non-empty list of targets')
+                ->addViolation();
+
+            return;
+        }
+
+        // `kind` is closed. A dwell at a node sticker sits at zero distance from one end of every
+        // link that node terminates, which is the degenerate corner of the geometry; a dwell at a
+        // marker card samples open floor. Pooling the two produces an uninterpretable statistic,
+        // so the tag has to be present and has to be one of two values.
+        $allowedKinds = ['card', 'node'];
+
+        foreach (array_values($config['targets']) as $index => $target) {
+            if (!is_array($target)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', sprintf('targets[%d]', $index))
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be an object')
+                    ->addViolation();
+                continue;
+            }
+
+            foreach (['value', 'label', 'room'] as $field) {
+                $this->requireString($target, $field, $type, $constraint);
+            }
+
+            if (!isset($target['kind']) || !in_array($target['kind'], $allowedKinds, true)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', sprintf('targets[%d].kind', $index))
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be one of: card, node')
+                    ->addViolation();
+            }
+        }
+    }
+
+    private function validateSensorCaptureConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::SENSOR_CAPTURE->value;
+
+        // The module id is the only contract; the rest of the config is passed opaque to the module.
+        $this->requireString($config, 'module', $type, $constraint);
+    }
+
+    private function validateBleAdvertiseConfig(array $config, ValidStepConfig $constraint): void
+    {
+        $type = QuestStepType::BLE_ADVERTISE->value;
+
+        // Required: how long the frame must stay on air. The identity itself comes from the lab
+        // bundle's advertise namespace, never from a quest config a participant can read.
+        $this->requirePositiveInteger($config, 'duration_seconds', $type, $constraint);
+
+        // Optional: commanded advertising interval. Android maps it onto AdvertiseSettings buckets
+        // and iOS cannot set it at all, so it is a request, not a promise — but an impossible
+        // value is still an authoring error.
+        if (isset($config['adv_interval_ms'])) {
+            $this->validateInteger($config, 'adv_interval_ms', $type, $constraint);
+            if (is_int($config['adv_interval_ms'])
+                && ($config['adv_interval_ms'] < 100 || $config['adv_interval_ms'] > 10240)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', 'adv_interval_ms')
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be between 100 and 10240 (BLE advertising interval bounds)')
+                    ->addViolation();
+            }
+        }
+
+        if (isset($config['tx_power'])) {
+            $this->validateString($config, 'tx_power', $type, $constraint);
+            $allowed = ['ultra_low', 'low', 'medium', 'high'];
+            if (is_string($config['tx_power']) && !in_array($config['tx_power'], $allowed, true)) {
+                $this->context->buildViolation($constraint->messageInvalidValue)
+                    ->setParameter('{{ field }}', 'tx_power')
+                    ->setParameter('{{ type }}', $type)
+                    ->setParameter('{{ reason }}', 'must be one of: ultra_low, low, medium, high')
+                    ->addViolation();
+            }
+        }
     }
 
     private function validateScanQrConfig(array $config, ValidStepConfig $constraint): void
@@ -107,16 +241,38 @@ class ValidStepConfigValidator extends ConstraintValidator
         // No validation needed for empty config
     }
 
+    /**
+     * IP-140 — the credential belongs to the lab bundle, never to a quest.
+     *
+     * Step config is served to every authenticated caller, so a password here is a published
+     * password. `ap_id` selects which of the bundle's access points to join; the SSID and the key
+     * are read from the bundle at run time, which is the same rule `ble_advertise` already follows
+     * for the advertise namespace.
+     */
     private function validateConnectToApConfig(array $config, ValidStepConfig $constraint): void
     {
         $type = QuestStepType::CONNECT_TO_AP->value;
 
-        // Required fields
-        $this->requireString($config, 'ssid', $type, $constraint);
+        $this->requireString($config, 'ap_id', $type, $constraint);
 
-        // Optional fields
-        if (isset($config['password'])) {
-            $this->validateString($config, 'password', $type, $constraint);
+        if (array_key_exists('password', $config)) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'password')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'must not be authored into a quest — step config is '
+                    . 'served to every authenticated caller, so the credential comes from the lab '
+                    . 'bundle via ap_id')
+                ->addViolation();
+        }
+
+        if (array_key_exists('ssid', $config)) {
+            $this->context->buildViolation($constraint->messageInvalidValue)
+                ->setParameter('{{ field }}', 'ssid')
+                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ reason }}', 'is read from the lab bundle, not from the quest — '
+                    . 'two sources for one SSID means the quest can name a network the handset '
+                    . 'cannot be given a key for')
+                ->addViolation();
         }
     }
 

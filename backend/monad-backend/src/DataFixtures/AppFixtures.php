@@ -5,6 +5,7 @@ namespace App\DataFixtures;
 use App\Entity\News;
 use App\Entity\QrCode;
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Enum\UserStatus;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -39,11 +40,16 @@ class AppFixtures extends Fixture
     {
         $users = [];
 
-        // Create admin user
+        // Create admin user.
+        //
+        // ROLE_SUPERADMIN, not ROLE_ADMIN: the latter is in no role_hierarchy entry and in no
+        // access_control rule, so it granted nothing and this account could not open /admin
+        // despite its name. It was also outside UserRole, which meant the admin's role editor
+        // dropped it from the ticks and erased it on the first save.
         $admin = new User();
         $admin->setEmail('admin@monad.sk');
         $admin->setName('Admin User');
-        $admin->setRoles(['ROLE_ADMIN']);
+        $admin->grantRole(UserRole::SUPERADMIN);
         $admin->setPassword($this->passwordHasher->hashPassword($admin, 'password123'));
         $admin->setStatus(UserStatus::ACTIVE);
         $manager->persist($admin);
